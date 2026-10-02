@@ -29,14 +29,18 @@ apps/
   api/                FastAPI app
     app/main.py       create_app() factory
     app/config.py     Settings from environment variables (pydantic-settings)
-    app/database.py   SQLAlchemy engine and connectivity check
+    app/database.py   SQLAlchemy engine, session factory, get_session dependency
+    app/models/       ORM models; Base with a constraint naming convention (no tables yet)
     app/api/          Routers, one module per area (health.py today)
+    alembic.ini       Alembic config (no database URL; env.py reads Settings)
+    migrations/       Alembic environment and revisions (empty baseline today)
     tests/            pytest
+    uv.lock           Locked Python dependencies
     Dockerfile        targets: dev, runtime (default)
 packages/
   ui/ types/ config/  Shared code, empty until two apps need the same thing
 database/
-  migrations/         Schema migrations (tool chosen when the first table is added)
+  migrations/         Pointer only: migrations live in apps/api/migrations (ADR 0004)
   seed/               Fake development data only
 docs/
   product/            SPEC.md
@@ -45,7 +49,7 @@ docs/
 tests/                Cross-service tests; unit tests live inside each app
 scripts/              setup-env.sh, smoke-test.sh
 docker/               Shared Docker assets (none yet); Dockerfiles live with their app
-.github/workflows/    ci.yml
+.github/              workflows/ci.yml, dependabot.yml
 docker-compose.yml    Development environment
 ```
 
@@ -56,8 +60,15 @@ Why this layout and why there is no JS workspace tooling yet:
 
 - **App factory.** `create_app(settings)` builds the app and its engine, so tests pass
   their own settings and nothing connects at import time. uvicorn runs it with `--factory`.
-- **Database access.** SQLAlchemy 2 with the psycopg 3 driver. The engine is created per
-  app and disposed on shutdown. No ORM models exist yet.
+- **Database access.** SQLAlchemy 2 with the psycopg 3 driver. The engine and a session
+  factory are created per app; the engine is disposed on shutdown. Endpoints take a
+  per-request session with `session: SessionDep` and commit explicitly. Models subclass
+  `app.models.Base`; none exist yet.
+- **Migrations.** Alembic, in `apps/api/migrations`, run as an explicit
+  `alembic upgrade head` step and never on API startup
+  ([ADR 0004](../decisions/0004-database-migrations-with-alembic.md)).
+- **Dependencies.** Locked in `uv.lock` and installed with `uv sync --frozen`
+  ([ADR 0005](../decisions/0005-python-dependency-locking-and-updates.md)).
 - **Routers.** One module per area under `app/api/`. Product modules will add their own.
 
 ## Frontend
@@ -93,20 +104,18 @@ Environment variables only; see [ADR 0003](../decisions/0003-configuration-throu
 
 `docker-compose.yml` runs `db`, `api` and `web`. The apps use their `dev` image targets
 with source bind-mounted for hot reload. Startup is ordered by health checks:
-db healthy, then api healthy, then web. Ports bind to 127.0.0.1 only.
+db healthy, then api healthy, then web. The `api` service applies migrations before it
+starts serving. Ports bind to 127.0.0.1 only.
 
 ## Testing
 
 | Level        | Where                         | Tooling           |
 | ------------ | ----------------------------- | ----------------- |
 | API unit     | `apps/api/tests`              | pytest, TestClient |
-| API + DB     | `apps/api/tests` (`integration` marker, needs `TEST_DATABASE_URL`) | pytest |
+| API + DB     | `apps/api/tests` (`integration` marker, needs `TEST_DATABASE_URL`): readiness, migrations up/down, `alembic check` | pytest |
 | Web unit     | `apps/web/src/**/*.test.ts`   | Vitest            |
 | End to end   | `scripts/smoke-test.sh`       | curl, against Compose |
 
 ## Open questions
 
-- Migration tool (Alembic is the likely choice) and where its config lives relative to
-  `database/migrations`.
 - Authentication model for a self-hosted, single-user-first app.
-- Python dependency locking (for example `uv lock`) for reproducible API images.

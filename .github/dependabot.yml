@@ -1,0 +1,44 @@
+# Weekly dependency update pull requests. Minor and patch updates are grouped per
+# ecosystem to keep the number of PRs small; major updates arrive one PR each.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /apps/api
+    schedule:
+      interval: weekly
+    groups:
+      api-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+    groups:
+      web-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directories: [/apps/api, /apps/web]
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
+        patterns: ["*"]
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # A PostgreSQL major upgrade needs a data migration, not just a new tag.
+      - dependency-name: postgres
+        update-types: [version-update:semver-major]

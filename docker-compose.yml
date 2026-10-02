@@ -1,4 +1,5 @@
-# Orbit development environment: PostgreSQL, API (auto-reload) and web (hot reload).
+# Orbit development environment: PostgreSQL, API (migrations, then auto-reload) and web
+# (hot reload).
 # Usage: ./scripts/setup-env.sh && docker compose up --build
 name: orbit
 
@@ -26,10 +27,16 @@ services:
     environment:
       ORBIT_ENV: ${ORBIT_ENV:-development}
       DATABASE_URL: postgresql://${POSTGRES_USER:-orbit}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-orbit}
+    # Apply migrations, then serve. Production runs `alembic upgrade head` as its own
+    # one-off step instead (docs/decisions/0004-database-migrations-with-alembic.md).
+    command: >-
+      sh -c "alembic upgrade head &&
+      exec uvicorn --factory app.main:create_app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     volumes:
       - ./apps/api/app:/app/app
+      - ./apps/api/migrations:/app/migrations
     depends_on:
       db:
         condition: service_healthy
