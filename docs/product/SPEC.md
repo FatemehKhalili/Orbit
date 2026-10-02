@@ -36,7 +36,7 @@ and self-hostable, so a person's life data stays under their control.
 | Phase | Scope                                                                 | Status      |
 | ----- | --------------------------------------------------------------------- | ----------- |
 | 1     | Scaffolding: repo structure, apps, database, Compose, health, docs    | Complete    |
-| 2     | Data foundations: Alembic migrations, model base, sessions, `uv.lock`, Dependabot | In progress |
+| 2     | Data foundations: Alembic migrations, model base, sessions, `uv.lock`, Dependabot | Complete    |
 | 3+    | To be defined                                                         | Not started |
 
 Phase 1 delivers no product features. The web app shows a placeholder with the six
