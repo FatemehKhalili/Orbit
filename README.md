@@ -6,7 +6,10 @@ Orbit is an open-source Personal Life Operating System. You sit at the centre, a
 parts of everyday life (money, time, routines, shopping, wishes) orbit around you in
 one place.
 
-> **Status:** Phase 1, project scaffolding. No product features are implemented yet.
+[![CI](https://github.com/FatemehKhalili/Orbit/actions/workflows/ci.yml/badge.svg)](https://github.com/FatemehKhalili/Orbit/actions/workflows/ci.yml)
+
+> **Status:** Phase 1 (project scaffolding) is complete, tagged `v0.1.0-phase1`. No product
+> features are implemented yet.
 
 ## MVP modules
 
@@ -20,6 +23,18 @@ Dashboard, Finance, Calendar, Habits, Shopping, Wishlist. See [docs/product/SPEC
 | Backend        | Python, FastAPI, SQLAlchemy, Pydantic              |
 | Database       | PostgreSQL                                         |
 | Infrastructure | Docker, Docker Compose                             |
+
+## Architecture
+
+```
+Browser ──▶ apps/web (Next.js) ──server-side──▶ apps/api (FastAPI) ──▶ PostgreSQL
+```
+
+The web app calls the API from its server using `ORBIT_API_URL`, so the browser never talks
+to the API directly. Each app builds and deploys on its own. All configuration comes from
+environment variables, with no credential defaults. Health endpoints: `GET /health` and
+`GET /health/ready` on the API, `GET /api/health` on the web app. Decisions are recorded in
+[docs/decisions/](docs/decisions/).
 
 ## Quick start (Docker Compose)
 
@@ -53,7 +68,16 @@ Each app runs and deploys on its own. See [apps/api/README.md](apps/api/README.m
 ./scripts/smoke-test.sh                # end to end, against a running stack
 ```
 
-CI runs all three on pushes to `main` and on pull requests (`.github/workflows/ci.yml`).
+CI runs on pushes to `main` and on pull requests (`.github/workflows/ci.yml`):
+
+| Job                 | What it checks                                                   |
+| ------------------- | ---------------------------------------------------------------- |
+| API                 | ruff lint and format, pytest (including readiness against Postgres) |
+| Web                 | ESLint, TypeScript, Vitest, production build                     |
+| Compose smoke test  | Starts db, api and web, then runs `scripts/smoke-test.sh`        |
+
+Phase 1 coverage: API health and configuration (13 tests), web configuration and API health
+states (12 tests), and the end-to-end smoke test.
 
 ## Repository layout
 
