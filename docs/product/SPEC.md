@@ -36,9 +36,14 @@ and self-hostable, so a person's life data stays under their control.
 | Phase | Scope                                                                 | Status      |
 | ----- | --------------------------------------------------------------------- | ----------- |
 | 1     | Scaffolding: repo structure, apps, database, Compose, health, docs    | Complete    |
-| 2+    | To be defined                                                         | Not started |
+| 2     | Data foundations: Alembic migrations, model base, sessions, `uv.lock`, Dependabot | In progress |
+| 3+    | To be defined                                                         | Not started |
 
 Phase 1 delivers no product features. The web app shows a placeholder with the six
 modules and the backend's health.
 
 Phase 1 checkpoint: tag `v0.1.0-phase1`, commit `9a555fd`, CI passing.
+
+Phase 2 is infrastructure only and adds no product features or tables: the API gains
+an empty baseline migration, a shared model base and per-request database sessions, and
+its dependencies are locked. See ADRs 0004 and 0005.

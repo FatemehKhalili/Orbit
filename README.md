@@ -8,7 +8,8 @@ one place.
 
 [![CI](https://github.com/FatemehKhalili/Orbit/actions/workflows/ci.yml/badge.svg)](https://github.com/FatemehKhalili/Orbit/actions/workflows/ci.yml)
 
-> **Status:** Phase 1 (project scaffolding) is complete, tagged `v0.1.0-phase1`. No product
+> **Status:** Phase 1 (project scaffolding) is complete, tagged `v0.1.0-phase1`. Phase 2
+> (data foundations: migrations, model base, locked dependencies) is in progress. No product
 > features are implemented yet.
 
 ## MVP modules
@@ -42,7 +43,7 @@ Requires Docker with Compose v2.
 
 ```bash
 ./scripts/setup-env.sh          # creates .env with a random database password
-docker compose up --build       # db, api and web, with hot reload
+docker compose up --build       # db, api (applies migrations) and web, with hot reload
 ./scripts/smoke-test.sh         # in another terminal: checks the whole stack
 ```
 
@@ -72,12 +73,15 @@ CI runs on pushes to `main` and on pull requests (`.github/workflows/ci.yml`):
 
 | Job                 | What it checks                                                   |
 | ------------------- | ---------------------------------------------------------------- |
-| API                 | ruff lint and format, pytest (including readiness against Postgres) |
+| API                 | uv.lock is current, ruff lint and format, pytest (including migrations and readiness against Postgres) |
 | Web                 | ESLint, TypeScript, Vitest, production build                     |
-| Compose smoke test  | Starts db, api and web, then runs `scripts/smoke-test.sh`        |
+| Compose smoke test  | Starts db, api and web, runs `scripts/smoke-test.sh`, then `alembic check` |
 
-Phase 1 coverage: API health and configuration (13 tests), web configuration and API health
-states (12 tests), and the end-to-end smoke test.
+Coverage: API health, configuration, database sessions and migrations (20 tests), web
+configuration and API health states (12 tests), and the end-to-end smoke test.
+
+Dependabot (`.github/dependabot.yml`) opens weekly update PRs for the API, the web app,
+GitHub Actions and Docker images.
 
 ## Repository layout
 
@@ -87,7 +91,7 @@ apps/api            FastAPI backend
 packages/ui         Shared UI components (placeholder)
 packages/types      Shared types (placeholder)
 packages/config     Shared tooling config (placeholder)
-database/migrations Schema migrations (placeholder)
+database/migrations Pointer to apps/api/migrations
 database/seed       Fake development data (placeholder)
 docs/               Product spec, architecture, decision records
 tests/              Cross-service tests
