@@ -9,8 +9,8 @@ one place.
 [![CI](https://github.com/FatemehKhalili/Orbit/actions/workflows/ci.yml/badge.svg)](https://github.com/FatemehKhalili/Orbit/actions/workflows/ci.yml)
 
 > **Status:** Phase 1 (project scaffolding) is complete, tagged `v0.1.0-phase1`. Phase 2
-> (data foundations: migrations, model base, locked dependencies) is in progress. No product
-> features are implemented yet.
+> (data foundations: migrations, model base, locked dependencies) is complete, tagged
+> `v0.2.0-phase2`. No product features are implemented yet.
 
 ## MVP modules
 
