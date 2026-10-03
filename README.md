@@ -11,7 +11,7 @@ one place.
 > **Status:** Phase 1 (project scaffolding) is complete, tagged `v0.1.0-phase1`. Phase 2
 > (data foundations: migrations, model base, locked dependencies) is complete, tagged
 > `v0.2.0-phase2`. Phase 3 (owner account and app shell: sign-in, sessions, navigation) is
-> in progress. No product module features are implemented yet.
+> complete, tagged `v0.3.0-phase3`. No product module features are implemented yet.
 
 ## MVP modules
 
