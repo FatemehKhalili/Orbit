@@ -26,6 +26,7 @@ The API listens on http://localhost:8000. Interactive docs are at `/docs`.
 | -------------- | -------- | ------------- | ----------------------------------------------- |
 | `DATABASE_URL` | yes      | none          | `postgresql://user:pass@host:5432/db`           |
 | `ORBIT_ENV`    | no       | `development` | One of `development`, `test`, `production`      |
+| `ORBIT_SESSION_TTL_DAYS` | no | `30`       | How long a sign-in lasts, 1–365 days            |
 
 ## Health endpoints
 
@@ -34,11 +35,36 @@ The API listens on http://localhost:8000. Interactive docs are at `/docs`.
 | `GET /health`       | Liveness: the process is up. No database call. | 200        |
 | `GET /health/ready` | Readiness: the database answers `SELECT 1`.    | 200 / 503  |
 
+## Owner account and sessions
+
+Each instance has exactly one owner; the database refuses a second row in `users`. Create
+the owner once from the command line (there is no sign-up endpoint):
+
+```bash
+.venv/bin/python -m app.cli create-owner --email you@example.com --name "Your Name"
+.venv/bin/python -m app.cli set-password      # new password; signs out every session
+```
+
+Both prompt for the password, or read one line from stdin with `--password-stdin`.
+Passwords need at least 12 characters.
+
+| Endpoint            | Auth   | Meaning                                                    |
+| ------------------- | ------ | ---------------------------------------------------------- |
+| `POST /auth/login`  | none   | `{"email", "password"}` → `{"token", "expires_at", "user"}`; 401 for any failure |
+| `POST /auth/logout` | Bearer | Revokes this session. 204                                  |
+| `GET /auth/me`      | Bearer | The owner: `{"id", "email", "display_name"}`               |
+
+Send the token as `Authorization: Bearer <token>`. Only its SHA-256 hash is stored.
+New endpoints protect themselves with `user: CurrentUserDep` (from `app.auth.dependencies`).
+See [ADR 0006](../../docs/decisions/0006-owner-account-and-sessions.md).
+
 ## Database migrations
 
 Alembic, configured in `alembic.ini` and `migrations/`. It reads `DATABASE_URL` the same
 way the API does. Models subclass `app.models.Base` and must be imported in
-`app/models/__init__.py` so autogenerate sees them.
+`app/models/__init__.py` so autogenerate sees them. Use the mixins in
+`app/models/mixins.py`: UUID primary key, timestamps, and `OwnedMixin` (`owner_id`) for
+every product-module table.
 
 ```bash
 .venv/bin/alembic upgrade head                          # apply all migrations
@@ -69,4 +95,5 @@ is set. They run the migrations up and down against it, so use a dedicated test 
 docker build -t orbit-api .                 # production image (default target)
 docker run --rm -e DATABASE_URL=... orbit-api alembic upgrade head   # migrate first
 docker run -p 8000:8000 -e DATABASE_URL=... orbit-api
+docker run --rm -it -e DATABASE_URL=... orbit-api python -m app.cli create-owner --email ... --name ...
 ```

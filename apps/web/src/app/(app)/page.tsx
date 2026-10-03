@@ -1,11 +1,11 @@
+import Link from "next/link";
 import { connection } from "next/server";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { checkApiHealth, type ApiHealth } from "@/lib/api-health";
-
-// The MVP modules, shown as placeholders until each one is built.
-const MODULES = ["Dashboard", "Finance", "Calendar", "Habits", "Shopping", "Wishlist"];
+import { requireUser } from "@/lib/auth";
+import { MODULES } from "@/lib/routes";
 
 const API_STATUS: Record<ApiHealth["state"], { label: string; detail: string; ok: boolean }> = {
   online: { label: "Online", detail: "API and database are reachable.", ok: true },
@@ -14,9 +14,10 @@ const API_STATUS: Record<ApiHealth["state"], { label: string; detail: string; ok
   unconfigured: { label: "Not configured", detail: "Set ORBIT_API_URL.", ok: false },
 };
 
-export default async function HomePage() {
+export default async function DashboardPage() {
   // Check the API on every request rather than once at build time.
   await connection();
+  await requireUser();
   const health = await checkApiHealth();
   const status = API_STATUS[health.state];
 
@@ -55,20 +56,22 @@ function OrbitDiagram() {
         You
       </div>
       <ul>
-        {MODULES.map((name, index) => {
+        {MODULES.map(({ name, href }, index) => {
           const angle = (index / MODULES.length) * 2 * Math.PI - Math.PI / 2;
           return (
             <li
-              key={name}
+              key={href}
               className="absolute -translate-x-1/2 -translate-y-1/2"
               style={{
                 left: `${50 + radius * Math.cos(angle)}%`,
                 top: `${50 + radius * Math.sin(angle)}%`,
               }}
             >
-              <Badge variant="secondary" className="px-3 py-1 text-sm" title="Coming soon">
-                {name}
-              </Badge>
+              <Link href={href}>
+                <Badge variant="secondary" className="px-3 py-1 text-sm">
+                  {name}
+                </Badge>
+              </Link>
             </li>
           );
         })}

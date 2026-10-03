@@ -10,7 +10,8 @@ one place.
 
 > **Status:** Phase 1 (project scaffolding) is complete, tagged `v0.1.0-phase1`. Phase 2
 > (data foundations: migrations, model base, locked dependencies) is complete, tagged
-> `v0.2.0-phase2`. No product features are implemented yet.
+> `v0.2.0-phase2`. Phase 3 (owner account and app shell: sign-in, sessions, navigation) is
+> in progress. No product module features are implemented yet.
 
 ## MVP modules
 
@@ -32,7 +33,9 @@ Browser ──▶ apps/web (Next.js) ──server-side──▶ apps/api (FastAP
 ```
 
 The web app calls the API from its server using `ORBIT_API_URL`, so the browser never talks
-to the API directly. Each app builds and deploys on its own. All configuration comes from
+to the API directly. Each instance has one owner, who signs in with email and password; the
+API keeps server-side sessions and stores only a hash of each session token
+([ADR 0006](docs/decisions/0006-owner-account-and-sessions.md)). Each app builds and deploys on its own. All configuration comes from
 environment variables, with no credential defaults. Health endpoints: `GET /health` and
 `GET /health/ready` on the API, `GET /api/health` on the web app. Decisions are recorded in
 [docs/decisions/](docs/decisions/).
@@ -44,8 +47,17 @@ Requires Docker with Compose v2.
 ```bash
 ./scripts/setup-env.sh          # creates .env with a random database password
 docker compose up --build       # db, api (applies migrations) and web, with hot reload
-./scripts/smoke-test.sh         # in another terminal: checks the whole stack
+
+# In another terminal, once: create the owner account (prompts for a password)
+docker compose exec api python -m app.cli create-owner --email you@example.com --name "Your Name"
 ```
+
+Then sign in at http://localhost:3000. Forgot the password? Run
+`docker compose exec api python -m app.cli set-password`, which also signs out every session.
+
+`./scripts/smoke-test.sh` checks the whole stack, including signing in and out. On a fresh
+database it creates a throwaway owner; on one that already has an owner, set
+`ORBIT_SMOKE_EMAIL` and `ORBIT_SMOKE_PASSWORD` to that account.
 
 | Service | URL                                  |
 | ------- | ------------------------------------ |
@@ -75,10 +87,12 @@ CI runs on pushes to `main` and on pull requests (`.github/workflows/ci.yml`):
 | ------------------- | ---------------------------------------------------------------- |
 | API                 | uv.lock is current, ruff lint and format, pytest (including migrations and readiness against Postgres) |
 | Web                 | ESLint, TypeScript, Vitest, production build                     |
+| Production images   | Builds the `runtime` image of each app and checks it starts (`scripts/check-image.sh`) |
 | Compose smoke test  | Starts db, api and web, runs `scripts/smoke-test.sh`, then `alembic check` |
 
-Coverage: API health, configuration, database sessions and migrations (20 tests), web
-configuration and API health states (12 tests), and the end-to-end smoke test.
+Coverage: API health, configuration, database sessions, migrations, sign-in, sessions, the
+one-owner rule and the admin CLI (76 tests); web configuration, API calls, the session
+cookie, login form logic and route protection (54 tests); and the end-to-end smoke test.
 
 Dependabot (`.github/dependabot.yml`) opens weekly update PRs for the API, the web app,
 GitHub Actions and Docker images.
@@ -106,6 +120,10 @@ Details in [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md
 
 All configuration comes from environment variables. `.env` files are git-ignored; only
 `*.env.example` files are committed, and they contain no real credentials.
+
+Session cookies are `Secure` in production builds, so serve Orbit over HTTPS. Only for a
+plain-HTTP install on a trusted home network, set `ORBIT_INSECURE_COOKIES=true` on the web
+app; anyone on that network could then read the session cookie in transit.
 
 ## License
 

@@ -11,3 +11,4 @@ marked as superseded with a link to the replacement.
 | [0003](0003-configuration-through-environment-variables.md) | Configuration through environment variables | Accepted |
 | [0004](0004-database-migrations-with-alembic.md) | Database migrations with Alembic, owned by the API | Accepted |
 | [0005](0005-python-dependency-locking-and-updates.md) | Python dependency locking with uv, updates with Dependabot | Accepted |
+| [0006](0006-owner-account-and-sessions.md) | One owner account with server-side sessions | Accepted |
