@@ -93,7 +93,10 @@ the API itself; another user's item looks the same as one that does not exist (4
 conventions later modules follow.
 
 **Without JavaScript:** adding, editing, checking and deleting all work as plain form
-posts. With JavaScript the same forms submit without reloading the page.
+posts. With JavaScript the same forms submit without reloading the page and show pending
+states. Deliberate limits: editing opens its own page rather than editing in place, and
+there is no loading placeholder while the list loads (it would need JavaScript to be
+replaced by the list).
 
 **Testing:** API tests cover every route, validation, and ownership with a second user
 (reading, changing and deleting another user's items fails); web unit tests cover the API

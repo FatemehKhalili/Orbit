@@ -15,7 +15,12 @@ npm run dev
 Open http://localhost:3000 and sign in with the owner account (create it with the API's
 `create-owner` command, see [apps/api/README.md](../api/README.md)). The dashboard shows a
 placeholder for the MVP modules and a **Backend** card that reports the API's
-`/health/ready` result; each other module has a placeholder page.
+`/health/ready` result. **Shopping** (`/shopping`) is the owner's shopping list; the other
+modules have placeholder pages.
+
+Server code calls the API through `src/lib/api-client.ts` (`apiRequest()`), which adds the
+session token and maps failures to `unauthenticated`, `not_found`, `invalid` or
+`unavailable`. Forms are Server Actions, so they work without JavaScript.
 
 ## Configuration
 
