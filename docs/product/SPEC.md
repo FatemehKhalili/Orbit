@@ -16,7 +16,7 @@ and self-hostable, so a person's life data stays under their control.
 | Finance   | Track money in and out.                                      |
 | Calendar  | See and plan time.                                           |
 | Habits    | Build and track routines.                                    |
-| Shopping  | Keep shopping lists.                                         |
+| Shopping  | Keep a shopping list (Phase 4, see below).                   |
 | Wishlist  | Collect things you want, for yourself or as gift ideas.      |
 
 ## Principles
@@ -38,7 +38,8 @@ and self-hostable, so a person's life data stays under their control.
 | 1     | Scaffolding: repo structure, apps, database, Compose, health, docs    | Complete    |
 | 2     | Data foundations: Alembic migrations, model base, sessions, `uv.lock`, Dependabot | Complete    |
 | 3     | Owner account and app shell: sign-in, sessions, signed-in layout and navigation, module placeholders, production image checks in CI | Complete    |
-| 4+    | To be defined                                                         | Not started |
+| 4     | Shopping: the first module, one personal shopping list per owner     | In progress |
+| 5+    | To be defined                                                         | Not started |
 
 Phase 1 delivers no product features. The web app shows a placeholder with the six
 modules and the backend's health.
@@ -65,3 +66,41 @@ no module features:
 Out of scope for Phase 3: module features, several users, external or social login,
 password reset by email, login rate limiting, and the open Dependabot updates. See
 ADR 0006.
+
+## Phase 4: Shopping
+
+Phase 4 builds the first real module. Every other module stays a placeholder, and the
+Dashboard does not change.
+
+**What the owner can do:** keep one shopping list. Add an item, edit it, check it off or
+uncheck it, and delete it. Unchecked items come first, then items in the order they were
+added.
+
+**Shopping item:**
+
+| Field      | Required | Rules                                                      |
+| ---------- | -------- | ---------------------------------------------------------- |
+| `name`     | yes      | 1 to 200 characters, trimmed                               |
+| `quantity` | no       | Free text up to 50 characters, such as "2" or "500 g"     |
+| `notes`    | no       | Up to 1,000 characters                                     |
+| `checked`  | yes      | `false` when the item is added                             |
+
+Each item also has an ID, its owner and its creation and update times.
+
+**Security:** every API query and change is limited to the signed-in owner's own items in
+the API itself; another user's item looks the same as one that does not exist (404). See
+[ADR 0007](../decisions/0007-product-module-api-conventions.md), which sets the API
+conventions later modules follow.
+
+**Without JavaScript:** adding, editing, checking and deleting all work as plain form
+posts. With JavaScript the same forms submit without reloading the page.
+
+**Testing:** API tests cover every route, validation, and ownership with a second user
+(reading, changing and deleting another user's items fails); web unit tests cover the API
+client and form logic; the smoke test adds, checks, edits and deletes an item through the
+real forms.
+
+Out of scope for Phase 4: several lists, categories, prices, stores, priorities,
+recurring items, sharing, reordering, a Dashboard summary, pagination, bulk actions such
+as "clear checked items", undo, and a delete confirmation step. The open Dependabot
+updates and login rate limiting stay separate.
