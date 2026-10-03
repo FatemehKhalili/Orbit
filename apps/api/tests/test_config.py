@@ -60,3 +60,13 @@ def test_database_password_is_hidden_in_repr_and_logs():
 
     assert "hunter2" not in repr(settings)
     assert "hunter2" not in str(settings.model_dump())
+
+
+def test_session_lifetime_defaults_to_30_days():
+    assert make_settings(DATABASE_URL="postgresql://u:p@db/orbit").session_ttl_days == 30
+
+
+@pytest.mark.parametrize("days", ["0", "366", "soon"])
+def test_session_lifetime_must_be_between_1_and_365_days(days):
+    with pytest.raises(ValidationError):
+        make_settings(DATABASE_URL="postgresql://u:p@db/orbit", ORBIT_SESSION_TTL_DAYS=days)

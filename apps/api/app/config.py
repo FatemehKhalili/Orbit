@@ -20,6 +20,9 @@ class Settings(BaseSettings):
         default="development", validation_alias="ORBIT_ENV"
     )
     database_url: SecretStr = Field(validation_alias="DATABASE_URL")
+    session_ttl_days: int = Field(
+        default=30, ge=1, le=365, validation_alias="ORBIT_SESSION_TTL_DAYS"
+    )
 
     @field_validator("database_url")
     @classmethod
