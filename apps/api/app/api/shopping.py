@@ -9,8 +9,8 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Response, status
-from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
-from sqlalchemy import delete, select
+from pydantic import AfterValidator, BaseModel, ConfigDict, StringConstraints, field_validator
+from sqlalchemy import delete, select, update
 
 from app.auth.dependencies import CurrentUserDep
 from app.database import SessionDep
@@ -19,11 +19,26 @@ from app.models.shopping import NAME_MAX_LENGTH, NOTES_MAX_LENGTH, QUANTITY_MAX_
 
 router = APIRouter(prefix="/shopping", tags=["shopping"])
 
+
+def _no_nul(value: str) -> str:
+    # PostgreSQL text cannot store NUL, so refuse it here (422) instead of failing in the
+    # database (500).
+    if "\x00" in value:
+        raise ValueError("must not contain NUL characters")
+    return value
+
+
+NoNul = AfterValidator(_no_nul)
+
 Name = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=NAME_MAX_LENGTH)
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=NAME_MAX_LENGTH),
+    NoNul,
 ]
-Quantity = Annotated[str, StringConstraints(strip_whitespace=True, max_length=QUANTITY_MAX_LENGTH)]
-Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=NOTES_MAX_LENGTH)]
+Quantity = Annotated[
+    str, StringConstraints(strip_whitespace=True, max_length=QUANTITY_MAX_LENGTH), NoNul
+]
+Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=NOTES_MAX_LENGTH), NoNul]
 
 NOT_FOUND = "Shopping item not found"
 
@@ -114,11 +129,20 @@ def get_item(item_id: uuid.UUID, user: CurrentUserDep, session: SessionDep) -> S
 def update_item(
     item_id: uuid.UUID, body: ShoppingItemUpdate, user: CurrentUserDep, session: SessionDep
 ) -> ShoppingItemOut:
-    item = _get_owned_item(session, user, item_id)
-    for field, value in body.model_dump(exclude_unset=True).items():
-        setattr(item, field, value)
+    changes = body.model_dump(exclude_unset=True)
+    if not changes:
+        return ShoppingItemOut.model_validate(_get_owned_item(session, user, item_id))
+    # One owner-filtered UPDATE ... RETURNING rather than load-then-flush, so an item
+    # deleted by another request at the same moment is "not found", like in delete_item.
+    item = session.scalar(
+        update(ShoppingItem)
+        .where(ShoppingItem.owner_id == user.id, ShoppingItem.id == item_id)
+        .values(**changes)
+        .returning(ShoppingItem)
+    )
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_FOUND)
     session.commit()
-    session.refresh(item)
     return ShoppingItemOut.model_validate(item)
 
 

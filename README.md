@@ -94,7 +94,7 @@ CI runs on pushes to `main` and on pull requests (`.github/workflows/ci.yml`):
 | Compose smoke test  | Starts db, api and web, runs `scripts/smoke-test.sh`, then `alembic check` |
 
 Coverage: API health, configuration, database sessions, migrations, sign-in, sessions, the
-one-owner rule, the admin CLI, and Shopping including ownership with a second user (131
+one-owner rule, the admin CLI, and Shopping including ownership with a second user (138
 tests); web configuration, the API client, the session cookie, login and Shopping form
 logic and route protection (104 tests); and the end-to-end smoke test.
 

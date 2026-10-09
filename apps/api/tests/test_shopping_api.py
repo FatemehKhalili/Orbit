@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 import pytest
-from sqlalchemy import inspect, text
+from sqlalchemy import event, inspect, text
 from sqlalchemy.exc import OperationalError
 
 from tests.conftest import OTHER_EMAIL, OTHER_PASSWORD, bearer, login
@@ -106,6 +106,10 @@ def test_text_is_trimmed_and_blank_optional_text_is_stored_as_null(client, token
         {"name": "Milk", "notes": "x" * 1001},
         {"name": "Milk", "checked": True},
         {"name": "Milk", "id": str(uuid.uuid4())},
+        # PostgreSQL text cannot hold NUL; it must be refused before reaching the database.
+        {"name": "Mi\x00lk"},
+        {"name": "Milk", "quantity": "1\x00"},
+        {"name": "Milk", "notes": "\x00"},
     ],
     ids=[
         "missing-name",
@@ -117,6 +121,9 @@ def test_text_is_trimmed_and_blank_optional_text_is_stored_as_null(client, token
         "long-notes",
         "checked-on-create",
         "client-id",
+        "nul-name",
+        "nul-quantity",
+        "nul-notes",
     ],
 )
 def test_invalid_items_are_refused(client, token, body):
@@ -143,7 +150,17 @@ def test_edit_changes_only_the_fields_sent(client, token):
     edited = response.json()
     assert (edited["name"], edited["quantity"], edited["notes"]) == ("Whole milk", "1 l", "Oat")
     assert edited["created_at"] == item["created_at"]
+    assert edited["updated_at"] > item["updated_at"]
     assert client.get(item_url(item["id"]), headers=bearer(token)).json() == edited
+
+
+def test_empty_edit_changes_nothing(client, token):
+    item = add(client, token)
+
+    response = client.patch(item_url(item["id"]), json={}, headers=bearer(token))
+
+    assert response.status_code == 200
+    assert response.json() == item
 
 
 def test_edit_clears_quantity_and_notes_with_null_or_blank(client, token):
@@ -177,8 +194,20 @@ def test_check_and_uncheck(client, token):
         {"quantity": "x" * 51},
         {"owner_id": str(uuid.uuid4())},
         {"created_at": "2020-01-01T00:00:00Z"},
+        {"name": "Mi\x00lk"},
+        {"notes": "Oat\x00"},
     ],
-    ids=["null-name", "blank-name", "null-checked", "bad-checked", "long-quantity", "owner", "ts"],
+    ids=[
+        "null-name",
+        "blank-name",
+        "null-checked",
+        "bad-checked",
+        "long-quantity",
+        "owner",
+        "ts",
+        "nul-name",
+        "nul-notes",
+    ],
 )
 def test_invalid_edits_are_refused_and_change_nothing(client, token, body):
     item = add(client, token)
@@ -200,6 +229,28 @@ def test_delete_removes_the_item(client, token):
     assert client.get(item_url(item["id"]), headers=bearer(token)).status_code == 404
     assert client.get(ITEMS, headers=bearer(token)).json() == [kept]
     assert client.delete(item_url(item["id"]), headers=bearer(token)).json() == NOT_FOUND
+
+
+def test_edit_of_an_item_deleted_at_the_same_moment_is_not_found(client, token, db_engine):
+    item = add(client, token)
+
+    # Another request deletes the item just before the edit's UPDATE reaches the
+    # database, for example a second tab deleting it while this one saves.
+    def delete_first(conn, cursor, statement, parameters, context, executemany):
+        if statement.startswith("UPDATE shopping_items"):
+            with db_engine.begin() as other:
+                other.execute(text("DELETE FROM shopping_items WHERE id = :id"), {"id": item["id"]})
+
+    app_engine = client.app.state.engine
+    event.listen(app_engine, "before_cursor_execute", delete_first)
+    try:
+        response = client.patch(item_url(item["id"]), json={"checked": True}, headers=bearer(token))
+    finally:
+        event.remove(app_engine, "before_cursor_execute", delete_first)
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND
+    assert client.get(ITEMS, headers=bearer(token)).json() == []
 
 
 def test_list_shows_unchecked_items_first_then_oldest_first(client, token):

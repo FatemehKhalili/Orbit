@@ -27,9 +27,12 @@ only worth anything if every query already respects it.
   and a plural resource (`/shopping/items`). Collection: `GET` (list) and `POST` (create,
   `201`). Item: `GET`, `PATCH` (partial update, `200`), `DELETE` (`204`). In a `PATCH`
   body, a field that is left out stays as it is and `null` clears an optional field.
+  A `PATCH` is one owner-filtered `UPDATE ... RETURNING`, not a load followed by a flush,
+  so a row deleted by another request at the same moment gives `404` rather than `500`.
 - **Text input.** Strings are trimmed. Required text must not be empty after trimming;
   optional text that is blank after trimming is stored as `NULL`. Every text column has
-  a maximum length, enforced by both the request model and the column type.
+  a maximum length, enforced by both the request model and the column type. Text
+  containing a NUL character is refused with `422`, because PostgreSQL cannot store it.
 - **Errors** keep FastAPI's shape, `{"detail": ...}`: `401` without a valid session, `404`
   for a missing or foreign row (and the ID is checked to be a UUID, `422` otherwise),
   `422` for invalid input.
