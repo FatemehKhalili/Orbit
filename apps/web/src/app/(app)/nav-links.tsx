@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { MODULES } from "@/lib/routes";
+import { isActiveModule, MODULES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 export function NavLinks() {
@@ -12,7 +12,7 @@ export function NavLinks() {
   return (
     <nav aria-label="Modules" className="flex flex-wrap gap-1">
       {MODULES.map(({ name, href }) => {
-        const active = pathname === href;
+        const active = isActiveModule(pathname, href);
         return (
           <Link
             key={href}

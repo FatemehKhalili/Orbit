@@ -4,7 +4,7 @@ from importlib.metadata import version
 
 from fastapi import FastAPI
 
-from app.api import auth, health
+from app.api import auth, health, shopping
 from app.config import Settings, get_settings
 from app.database import create_database_engine, create_session_factory
 
@@ -24,4 +24,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.session_factory = create_session_factory(engine)
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(shopping.router)
     return app

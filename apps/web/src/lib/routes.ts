@@ -1,4 +1,4 @@
-/** The MVP modules, in navigation order. Only the Dashboard has content so far. */
+/** The MVP modules, in navigation order. Dashboard and Shopping have content so far. */
 export const MODULES = [
   { name: "Dashboard", href: "/" },
   { name: "Finance", href: "/finance" },
@@ -7,6 +7,12 @@ export const MODULES = [
   { name: "Shopping", href: "/shopping" },
   { name: "Wishlist", href: "/wishlist" },
 ] as const;
+
+/** Whether a navigation link is the current module, including its sub-pages. */
+export function isActiveModule(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export const LOGIN_PATH = "/login";
 

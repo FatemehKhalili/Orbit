@@ -2,6 +2,7 @@
 
 from app.models.base import NAMING_CONVENTION, Base
 from app.models.session import AuthSession
+from app.models.shopping import ShoppingItem
 from app.models.user import User
 
-__all__ = ["NAMING_CONVENTION", "AuthSession", "Base", "User"]
+__all__ = ["NAMING_CONVENTION", "AuthSession", "Base", "ShoppingItem", "User"]

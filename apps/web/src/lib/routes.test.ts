@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MODULES, isPublicPath, loginRedirectFor } from "./routes";
+import { MODULES, isActiveModule, isPublicPath, loginRedirectFor } from "./routes";
 
 describe("isPublicPath", () => {
   it.each(["/login", "/login/", "/api/health"])("%s is public", (path) => {
@@ -40,5 +40,26 @@ describe("MODULES", () => {
       "Wishlist",
     ]);
     expect(MODULES[0].href).toBe("/");
+  });
+});
+
+describe("isActiveModule", () => {
+  it("highlights a module on its own page and its sub-pages", () => {
+    expect(isActiveModule("/shopping", "/shopping")).toBe(true);
+    expect(isActiveModule("/shopping/123/edit", "/shopping")).toBe(true);
+  });
+
+  it("does not highlight a module on other pages", () => {
+    expect(isActiveModule("/shoppingx", "/shopping")).toBe(false);
+    expect(isActiveModule("/finance", "/shopping")).toBe(false);
+  });
+
+  it("highlights the Dashboard only on /", () => {
+    expect(isActiveModule("/", "/")).toBe(true);
+    expect(isActiveModule("/shopping", "/")).toBe(false);
+  });
+
+  it("protects Shopping sub-pages like any other page", () => {
+    expect(loginRedirectFor("/shopping/123/edit", false)).toBe("/login");
   });
 });

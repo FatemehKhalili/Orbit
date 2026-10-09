@@ -6,7 +6,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine, insert, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import Settings, get_settings
@@ -21,6 +21,8 @@ API_ROOT = Path(__file__).resolve().parents[1]
 # Fake credentials for tests only.
 OWNER_EMAIL = "owner@example.com"
 OWNER_PASSWORD = "correct horse battery staple"
+OTHER_EMAIL = "other@example.com"
+OTHER_PASSWORD = "another horse battery staple"
 
 
 @pytest.fixture
@@ -46,7 +48,7 @@ def db_settings(monkeypatch) -> Iterator[Settings]:
     test_settings = Settings(ORBIT_ENV="test", DATABASE_URL=url, _env_file=None)
     engine = create_database_engine(test_settings)
     with engine.begin() as connection:
-        connection.execute(text("TRUNCATE users, sessions CASCADE"))
+        connection.execute(text("TRUNCATE users, sessions, shopping_items CASCADE"))
     engine.dispose()
 
     yield test_settings
@@ -89,3 +91,46 @@ def login(client: TestClient, email: str = OWNER_EMAIL, password: str = OWNER_PA
 
 def bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def two_users_client(db_settings, db_engine) -> Iterator[TestClient]:
+    """A client for an API whose database has two users: the owner and OTHER_EMAIL.
+
+    Orbit allows one user per instance (`uq_users_is_owner`), but ownership checks need
+    a second user to prove anything. This fixture drops that constraint inside one
+    transaction, adds both users, serves the API on that same connection and rolls the
+    transaction back afterwards. PostgreSQL DDL is transactional, so no other
+    connection ever sees the constraint missing, and nothing survives the test.
+    Requests commit to savepoints inside the outer transaction.
+    """
+    from app.auth.passwords import hash_password
+    from app.models import User
+
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    try:
+        connection.execute(text("ALTER TABLE users DROP CONSTRAINT uq_users_is_owner"))
+        connection.execute(
+            insert(User),
+            [
+                {
+                    "email": email,
+                    "display_name": name,
+                    "password_hash": hash_password(password),
+                }
+                for email, name, password in [
+                    (OWNER_EMAIL, "Test Owner", OWNER_PASSWORD),
+                    (OTHER_EMAIL, "Other User", OTHER_PASSWORD),
+                ]
+            ],
+        )
+        app = create_app(db_settings)
+        app.state.session_factory = sessionmaker(
+            bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint"
+        )
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        transaction.rollback()
+        connection.close()

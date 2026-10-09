@@ -60,7 +60,9 @@ def test_migrations_upgrade_downgrade_and_match_the_models(database_url_from_env
     try:
         command.upgrade(config, "head")
         inspector = inspect(engine)
-        assert {"alembic_version", "users", "sessions"} <= set(inspector.get_table_names())
+        assert {"alembic_version", "users", "sessions", "shopping_items"} <= set(
+            inspector.get_table_names()
+        )
         assert {c["name"] for c in inspector.get_unique_constraints("users")} == {
             "uq_users_email",
             "uq_users_is_owner",
@@ -70,6 +72,12 @@ def test_migrations_upgrade_downgrade_and_match_the_models(database_url_from_env
         ]
         assert [fk["name"] for fk in inspector.get_foreign_keys("sessions")] == [
             "fk_sessions_user_id_users"
+        ]
+        [shopping_fk] = inspector.get_foreign_keys("shopping_items")
+        assert shopping_fk["name"] == "fk_shopping_items_owner_id_users"
+        assert shopping_fk["options"]["ondelete"] == "CASCADE"
+        assert [ix["name"] for ix in inspector.get_indexes("shopping_items")] == [
+            "ix_shopping_items_owner_id"
         ]
 
         # Models and migrations agree: autogenerate would produce no changes.

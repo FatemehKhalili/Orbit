@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # Check a running stack end to end: health endpoints, then the owner signing in and out
-# through the web app's login form (proving web -> API -> database and the session cookie).
+# through the web app's login form (proving web -> API -> database and the session cookie),
+# and using the Shopping list through its forms in between.
 # Usage: ./scripts/smoke-test.sh   (after `docker compose up`)
 #
 # Signing in needs an owner. With ORBIT_SMOKE_EMAIL and ORBIT_SMOKE_PASSWORD set, the
@@ -34,14 +35,21 @@ status_of() {
 }
 
 # Submit the form on a web page the way a browser without JavaScript would: copy the
-# page's hidden Server Action fields, add the given fields, post it back to the same URL.
+# form's hidden Server Action fields, add the given fields, post it back to the same URL.
+# With FORM set, use the form with that data-testid; otherwise the page's only form.
 # Writes the response headers to $WORK/headers.
 submit_form() {
   page=$1 session=$2
   shift 2
   curl -fsS --max-time 10 ${session:+-H "Cookie: $COOKIE=$session"} "$page" > "$WORK/page.html" \
     || fail "could not load $page"
-  grep -o '<input type="hidden" name="[^"]*"\( value="[^"]*"\)\{0,1\}/>' "$WORK/page.html" \
+  if [ -n "${FORM:-}" ]; then
+    tr -d '\n' < "$WORK/page.html" | grep -o "<form[^>]*data-testid=\"$FORM\".*" \
+      | sed 's#</form>.*##' > "$WORK/form.html" || fail "no form $FORM on $page"
+  else
+    cp "$WORK/page.html" "$WORK/form.html"
+  fi
+  grep -o '<input type="hidden" name="[^"]*"\( value="[^"]*"\)\{0,1\}/>' "$WORK/form.html" \
     | sed -e 's/<input type="hidden" name="\([^"]*\)"\( value="\(.*\)"\)\{0,1\}\/>/\1=\3/' \
           -e 's/&quot;/"/g' -e 's/&amp;/\&/g' > "$WORK/fields"
   [ -s "$WORK/fields" ] || fail "no form found on $page"
@@ -72,6 +80,7 @@ if [ -z "${ORBIT_SMOKE_EMAIL:-}" ]; then
         --email "$ORBIT_SMOKE_EMAIL" --name "Smoke Test" --password-stdin > /dev/null \
     || fail "could not create a throwaway owner; on an instance that already has one, set ORBIT_SMOKE_EMAIL and ORBIT_SMOKE_PASSWORD"
   ok "created throwaway owner"
+  FRESH_OWNER=1
 fi
 
 ORIGIN=https://attacker.example submit_form "$WEB_URL/login" "" \
@@ -94,12 +103,50 @@ ok "web sign-in sets an HttpOnly session cookie"
 body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/") || fail "web: dashboard failed"
 case $body in *Online*) ok "web dashboard sees backend online" ;; *) fail "web: dashboard did not show the backend as Online" ;; esac
 case $body in *'data-testid="current-user"'*) ok "web shows the signed-in owner" ;; *) fail "web: no signed-in owner on the dashboard" ;; esac
-body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/shopping") || fail "web: /shopping failed"
-case $body in *"Coming in a later phase"*) ok "web module placeholder" ;; *) fail "web: /shopping placeholder missing" ;; esac
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/wishlist") || fail "web: /wishlist failed"
+case $body in *"Coming in a later phase"*) ok "web module placeholder" ;; *) fail "web: /wishlist placeholder missing" ;; esac
 
 [ "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SESSION" "$API_URL/auth/me")" = 200 ] \
   || fail "api: /auth/me rejected the web session token"
 ok "api accepts the session token"
+
+# Shopping, through the same forms a browser without JavaScript would use. The API (with
+# the session token) is the witness for what each form changed.
+api_get() { curl -sS --max-time 10 -H "Authorization: Bearer $SESSION" "$API_URL$1"; }
+
+[ "$(curl -sS -o /dev/null -w '%{http_code}' "$API_URL/shopping/items")" = 401 ] \
+  || fail "api: /shopping/items must refuse requests without a session"
+ok "api refuses shopping requests without a session"
+
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/shopping") || fail "web: /shopping failed"
+case $body in *'data-testid="shopping-list"'*) ok "web shopping page" ;; *) fail "web: /shopping did not show the list" ;; esac
+if [ -n "${FRESH_OWNER:-}" ]; then
+  case $body in *'data-testid="shopping-empty"'*) ok "web shopping empty state" ;; *) fail "web: a new owner's list should be empty" ;; esac
+fi
+
+ITEM="Smoke test milk $(date +%s)"
+FORM=add-item-form submit_form "$WEB_URL/shopping" "$SESSION" \
+  --form-string "name=$ITEM" --form-string "quantity=2 l" --form-string "notes="
+ID=$(api_get /shopping/items | tr '{' '\n' | grep -F "\"name\":\"$ITEM\"" | sed -n 's/^"id":"\([^"]*\)".*/\1/p')
+[ -n "$ID" ] || fail "web: adding an item through the form did not create it"
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/shopping") || fail "web: /shopping failed"
+case $body in *"$ITEM"*) ok "web adds a shopping item" ;; *) fail "web: the new item is not on the list" ;; esac
+
+FORM="toggle-item-$ID" submit_form "$WEB_URL/shopping" "$SESSION"
+case $(api_get "/shopping/items/$ID") in *'"checked":true'*) ok "web checks off an item" ;; *) fail "web: checking off did not stick" ;; esac
+
+FORM=edit-item-form submit_form "$WEB_URL/shopping/$ID/edit" "$SESSION" \
+  --form-string "name=$ITEM edited" --form-string "quantity=" --form-string "notes=Oat"
+grep -qi "^location: /shopping" "$WORK/headers" || fail "web: saving an edit did not return to /shopping"
+case $(api_get "/shopping/items/$ID") in
+  *"\"name\":\"$ITEM edited\",\"quantity\":null,\"notes\":\"Oat\""*) ok "web edits an item" ;;
+  *) fail "web: the edit was not saved" ;;
+esac
+
+FORM="delete-item-$ID" submit_form "$WEB_URL/shopping" "$SESSION"
+[ "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SESSION" "$API_URL/shopping/items/$ID")" = 404 ] \
+  || fail "web: deleting the item did not remove it"
+ok "web deletes an item"
 
 submit_form "$WEB_URL/" "$SESSION"
 grep -qi "^location: /login" "$WORK/headers" || fail "web: signing out did not redirect to /login"

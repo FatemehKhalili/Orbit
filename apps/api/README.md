@@ -58,6 +58,20 @@ Send the token as `Authorization: Bearer <token>`. Only its SHA-256 hash is stor
 New endpoints protect themselves with `user: CurrentUserDep` (from `app.auth.dependencies`).
 See [ADR 0006](../../docs/decisions/0006-owner-account-and-sessions.md).
 
+## Shopping
+
+| Endpoint                         | Meaning                                                   |
+| -------------------------------- | --------------------------------------------------------- |
+| `GET /shopping/items`            | The owner's items: unchecked first, then oldest first     |
+| `POST /shopping/items`           | `{"name", "quantity"?, "notes"?}` → the item, 201         |
+| `GET /shopping/items/{id}`       | One item, or 404                                          |
+| `PATCH /shopping/items/{id}`     | Any of `name`, `quantity`, `notes`, `checked`; `null` clears quantity or notes |
+| `DELETE /shopping/items/{id}`    | 204, or 404                                               |
+
+All need a session. Every query filters on the signed-in owner; another user's item is a
+404, and request bodies refuse unknown fields such as `owner_id`. Later modules follow the
+same rules: [ADR 0007](../../docs/decisions/0007-product-module-api-conventions.md).
+
 ## Database migrations
 
 Alembic, configured in `alembic.ini` and `migrations/`. It reads `DATABASE_URL` the same

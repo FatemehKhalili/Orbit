@@ -11,7 +11,8 @@ one place.
 > **Status:** Phase 1 (project scaffolding) is complete, tagged `v0.1.0-phase1`. Phase 2
 > (data foundations: migrations, model base, locked dependencies) is complete, tagged
 > `v0.2.0-phase2`. Phase 3 (owner account and app shell: sign-in, sessions, navigation) is
-> complete, tagged `v0.3.0-phase3`. No product module features are implemented yet.
+> complete, tagged `v0.3.0-phase3`. Phase 4 (Shopping, the first module) is in progress.
+> The other modules are placeholders.
 
 ## MVP modules
 
@@ -35,7 +36,9 @@ Browser ──▶ apps/web (Next.js) ──server-side──▶ apps/api (FastAP
 The web app calls the API from its server using `ORBIT_API_URL`, so the browser never talks
 to the API directly. Each instance has one owner, who signs in with email and password; the
 API keeps server-side sessions and stores only a hash of each session token
-([ADR 0006](docs/decisions/0006-owner-account-and-sessions.md)). Each app builds and deploys on its own. All configuration comes from
+([ADR 0006](docs/decisions/0006-owner-account-and-sessions.md)). Module data belongs to its
+owner, and the API limits every query to the signed-in owner's rows
+([ADR 0007](docs/decisions/0007-product-module-api-conventions.md)). Each app builds and deploys on its own. All configuration comes from
 environment variables, with no credential defaults. Health endpoints: `GET /health` and
 `GET /health/ready` on the API, `GET /api/health` on the web app. Decisions are recorded in
 [docs/decisions/](docs/decisions/).
@@ -91,8 +94,9 @@ CI runs on pushes to `main` and on pull requests (`.github/workflows/ci.yml`):
 | Compose smoke test  | Starts db, api and web, runs `scripts/smoke-test.sh`, then `alembic check` |
 
 Coverage: API health, configuration, database sessions, migrations, sign-in, sessions, the
-one-owner rule and the admin CLI (76 tests); web configuration, API calls, the session
-cookie, login form logic and route protection (54 tests); and the end-to-end smoke test.
+one-owner rule, the admin CLI, and Shopping including ownership with a second user (131
+tests); web configuration, the API client, the session cookie, login and Shopping form
+logic and route protection (104 tests); and the end-to-end smoke test.
 
 Dependabot (`.github/dependabot.yml`) opens weekly update PRs for the API, the web app,
 GitHub Actions and Docker images.

@@ -23,22 +23,26 @@ The web app reaches the API from its server, not from the browser
 apps/
   web/                Next.js app (App Router, src/ layout)
     src/app/          Routes: login/ (sign-in form and Server Action), (app)/ (signed-in
-                      layout, dashboard, one placeholder page per module), api/health
+                      layout, dashboard, shopping/ with its Server Actions, one placeholder
+                      page per other module), api/health
     src/proxy.ts      Sends requests without a session cookie to /login
     src/components/ui shadcn/ui components (copied in, owned by us)
-    src/lib/          config.ts (env parsing), api-health.ts, auth-api.ts (calls the API),
-                      auth.ts and session.ts (session cookie), routes.ts (modules, public paths)
+    src/lib/          config.ts (env parsing), api-client.ts (calls the API), api-health.ts,
+                      auth-api.ts, auth.ts and session.ts (session cookie), shopping-api.ts
+                      and shopping.ts (Shopping calls and form logic), routes.ts
     Dockerfile        targets: dev, runtime (default)
   api/                FastAPI app
     app/main.py       create_app() factory
     app/config.py     Settings from environment variables (pydantic-settings)
     app/database.py   SQLAlchemy engine, session factory, get_session dependency
-    app/models/       ORM models: Base (naming convention), mixins, User, AuthSession
+    app/models/       ORM models: Base (naming convention), mixins, User, AuthSession,
+                      ShoppingItem
     app/auth/         Passwords, session tokens, owner/session service, CurrentUserDep
-    app/api/          Routers, one module per area (health.py, auth.py)
+    app/api/          Routers, one module per area (health.py, auth.py, shopping.py)
     app/cli.py        Admin commands: create-owner, set-password
     alembic.ini       Alembic config (no database URL; env.py reads Settings)
-    migrations/       Alembic environment and revisions (baseline, users and sessions)
+    migrations/       Alembic environment and revisions (baseline, users and sessions,
+                      shopping items)
     tests/            pytest
     uv.lock           Locked Python dependencies
     Dockerfile        targets: dev, runtime (default)
@@ -77,9 +81,12 @@ Why this layout and why there is no JS workspace tooling yet:
   ([ADR 0004](../decisions/0004-database-migrations-with-alembic.md)).
 - **Dependencies.** Locked in `uv.lock` and installed with `uv sync --frozen`
   ([ADR 0005](../decisions/0005-python-dependency-locking-and-updates.md)).
-- **Routers.** One module per area under `app/api/`. Product modules will add their own.
+- **Routers.** One module per area under `app/api/`; each product module adds its own.
   Every endpoint except health checks and `POST /auth/login` takes `CurrentUserDep`.
   Errors use FastAPI's default shape, `{"detail": ...}`.
+- **Product modules** follow [ADR 0007](../decisions/0007-product-module-api-conventions.md):
+  every query filters on the signed-in owner in SQL, another user's row is a 404, request
+  bodies refuse unknown fields, `PATCH` for partial updates, no pagination yet.
 
 ## Authentication
 
@@ -97,6 +104,7 @@ Browser ──cookie──▶ web: proxy (cookie present?) ─▶ layout/page �
 | ----- | ----- | ------------ |
 | `users` | API database | At most one row, enforced by `ck_users_single_owner` + `uq_users_is_owner` |
 | `sessions` | API database | SHA-256 hash of each token, expiry; deleting the row revokes it |
+| `shopping_items` | API database | Shopping items, each with an `owner_id` (cascade on delete) |
 | `POST /auth/login` | API | Email + password → token and expiry; same 401 for every failure |
 | `POST /auth/logout` | API | Revokes the calling session (204) |
 | `GET /auth/me` | API | The signed-in owner, or 401 |
@@ -109,9 +117,15 @@ Browser ──cookie──▶ web: proxy (cookie present?) ─▶ layout/page �
   configured; `card` and `badge` added).
 - `/login` is public. Everything under the `(app)` route group is signed in: the layout
   shows the module navigation and a sign-out button; the dashboard renders on each request
-  and calls the API's readiness endpoint; the other modules have placeholder pages.
+  and calls the API's readiness endpoint; Shopping has its list and an edit page; the other
+  modules have placeholder pages.
+- Server code calls the API through `src/lib/api-client.ts`, which adds the session token
+  and returns a typed result (`unauthenticated`, `not_found`, `invalid`, `unavailable`).
 - Forms post to Server Actions, so they work without JavaScript and get Next.js's
-  same-origin check. Route handlers are GET-only.
+  same-origin check. Route handlers are GET-only. Forms use `useActionState` for errors and
+  pending states; an action whose session has expired clears the cookie and redirects to
+  `/login`. Module pages have no `loading.tsx`: a streamed loading state is replaced by
+  the real page only with JavaScript, so without it the page would never appear.
 - Built with `output: "standalone"` for a small production image.
 
 ## Health endpoints
@@ -150,10 +164,10 @@ starts serving. Ports bind to 127.0.0.1 only.
 | Level        | Where                         | Tooling           |
 | ------------ | ----------------------------- | ----------------- |
 | API unit     | `apps/api/tests`              | pytest, TestClient |
-| API + DB     | `apps/api/tests` (`integration` marker, needs `TEST_DATABASE_URL`): readiness, migrations up/down, `alembic check`, sign-in, sessions, the one-owner constraint (including concurrent inserts), admin CLI | pytest |
+| API + DB     | `apps/api/tests` (`integration` marker, needs `TEST_DATABASE_URL`): readiness, migrations up/down, `alembic check`, sign-in, sessions, the one-owner constraint (including concurrent inserts), admin CLI, Shopping CRUD and ownership with a second user (`two_users_client`, ADR 0007) | pytest |
 | Web unit     | `apps/web/src/**/*.test.ts`   | Vitest            |
 | Images       | `scripts/check-image.sh`      | Builds and starts each `runtime` image in CI |
-| End to end   | `scripts/smoke-test.sh`: health, then sign in, browse and sign out through the web form | curl, against Compose |
+| End to end   | `scripts/smoke-test.sh`: health, then sign in, add, check, edit and delete a shopping item, and sign out, all through the web forms | curl, against Compose |
 
 ## Open questions
 
