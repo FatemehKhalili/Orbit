@@ -11,8 +11,8 @@ one place.
 > **Status:** Phase 1 (project scaffolding) is complete, tagged `v0.1.0-phase1`. Phase 2
 > (data foundations: migrations, model base, locked dependencies) is complete, tagged
 > `v0.2.0-phase2`. Phase 3 (owner account and app shell: sign-in, sessions, navigation) is
-> complete, tagged `v0.3.0-phase3`. Phase 4 (Shopping, the first module) is in progress.
-> The other modules are placeholders.
+> complete, tagged `v0.3.0-phase3`. Phase 4 (Shopping, the first module) is complete,
+> tagged `v0.4.0-phase4`. The other modules are placeholders.
 
 ## MVP modules
 
