@@ -36,6 +36,7 @@ calendar dates are formatted in UTC, so the web server's own timezone never move
 | --------------- | -------- | ---------------------------------------------------------- |
 | `ORBIT_API_URL` | yes      | Base URL of the API, as seen from the Next.js server.      |
 | `ORBIT_INSECURE_COOKIES` | no | `true` drops `Secure` from the session cookie in production builds. Only for plain HTTP on a trusted home network. |
+| `ORBIT_TRUSTED_PROXY` | no | `true` sends the browser's address (the rightmost `X-Forwarded-For` entry) to the API's sign-in throttle. Only behind a proxy that sets that header, such as the `https` profile's Caddy. |
 
 `ORBIT_API_URL` is read on the server at request time and never shipped to the browser.
 See [ADR 0002](../../docs/decisions/0002-frontend-calls-backend-server-side.md).
@@ -48,6 +49,16 @@ cookie (`HttpOnly`, `SameSite=Lax`, `Secure` in production). `src/proxy.ts` send
 without that cookie to `/login`; the signed-in layout and pages check the session with
 the API's `GET /auth/me`. Sign out revokes the session on the API and deletes the cookie.
 State-changing requests go through Server Actions only; route handlers are GET-only.
+
+A successful sign-in also sets `orbit_device` (`HttpOnly`, `SameSite=Lax`, `Secure` in
+production, 365 days): the browser's known-device token, sent with later sign-ins so
+throttling cannot lock the owner out of a browser they already use. A throttled sign-in
+shows "Too many sign-in attempts. Try again in N minutes."
+([ADR 0010](../../docs/decisions/0010-sign-in-throttling-and-known-devices.md)).
+
+"Download my data" in the signed-in layout links to `/account/export`, a GET route
+handler that passes the API's export through as a file download (`no-store`). It works
+without JavaScript. Every response carries security headers (`src/lib/security-headers.ts`).
 
 ## Health endpoint
 
