@@ -39,7 +39,7 @@ and self-hostable, so a person's life data stays under their control.
 | 2     | Data foundations: Alembic migrations, model base, sessions, `uv.lock`, Dependabot | Complete    |
 | 3     | Owner account and app shell: sign-in, sessions, signed-in layout and navigation, module placeholders, production image checks in CI | Complete    |
 | 4     | Shopping: the first module, one personal shopping list per owner     | Complete    |
-| 5     | Habits: daily habits checked off over the last seven days, archive and delete, one instance timezone | In progress |
+| 5     | Habits: daily habits checked off over the last seven days, archive and delete, one instance timezone | Complete    |
 | 6+    | To be defined                                                         | Not started |
 
 Phase 1 delivers no product features. The web app shows a placeholder with the six

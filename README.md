@@ -12,8 +12,8 @@ one place.
 > (data foundations: migrations, model base, locked dependencies) is complete, tagged
 > `v0.2.0-phase2`. Phase 3 (owner account and app shell: sign-in, sessions, navigation) is
 > complete, tagged `v0.3.0-phase3`. Phase 4 (Shopping, the first module) is complete,
-> tagged `v0.4.0-phase4`. Phase 5 (Habits) is in progress. The other modules are
-> placeholders.
+> tagged `v0.4.0-phase4`. Phase 5 (Habits) is complete, tagged `v0.5.0-phase5`. The other
+> modules are placeholders.
 
 ## MVP modules
 
