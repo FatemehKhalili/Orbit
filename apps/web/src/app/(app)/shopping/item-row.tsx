@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
+import { FormMessage } from "@/components/form-message";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { IDLE } from "@/lib/shopping";
@@ -10,7 +11,6 @@ import type { ShoppingItem } from "@/lib/shopping-api";
 import { cn } from "@/lib/utils";
 
 import { deleteItem, toggleItem } from "./actions";
-import { FormMessage } from "./form-message";
 
 /** One item: check it off, edit it or delete it. Each control is its own small form. */
 export function ItemRow({ item }: { item: ShoppingItem }) {

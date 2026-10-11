@@ -81,6 +81,7 @@ describe("apiRequest", () => {
   it.each([
     [401, "unauthenticated"],
     [404, "not_found"],
+    [409, "conflict"],
     [422, "invalid"],
     [400, "unavailable"],
     [500, "unavailable"],
