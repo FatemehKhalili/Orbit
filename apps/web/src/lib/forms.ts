@@ -32,10 +32,7 @@ export function textLength(value: string): number {
 }
 
 /** What to tell the user for each API failure other than a lost session. */
-export type ApiErrorMessages = Record<
-  Exclude<ApiError, "unauthenticated">,
-  string
->;
+export type ApiErrorMessages = Record<Exclude<ApiError, "unauthenticated">, string>;
 
 /** The form state for a failed API call: signed out, or the module's message. */
 export function failedState<Fields>(
