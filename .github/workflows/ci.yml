@@ -110,6 +110,24 @@ jobs:
           docker compose -f compose.production.yml --profile https config --format json \
             | jq -e '[.services | to_entries[] | select(.value.ports) | {service: .key, ip: [.value.ports[].host_ip]}]
                      | sort_by(.service) == [{service: "https", ip: ["127.0.0.1", "127.0.0.1"]}, {service: "web", ip: ["127.0.0.1"]}]'
+      # The guide's own command, on this fresh runner, with nothing but the generated .env.
+      - name: Install exactly as docs/deployment/README.md says
+        run: |
+          docker compose -f compose.production.yml up -d --build --wait
+          docker compose -f compose.production.yml ps -a
+          test "$(docker compose -f compose.production.yml ps -a --format '{{.ExitCode}}' migrate)" = 0
+          curl -fsS --max-time 10 http://127.0.0.1:3000/api/health | grep -q '"status":"ok"'
+          curl -fsS --max-time 10 http://127.0.0.1:3000/login | grep -q 'Sign in'
+          curl -fsS --max-time 10 -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/ | grep -q 307
+      - name: From the host, only the web app answers
+        run: |
+          docker ps --format '{{.Names}} {{.Ports}}' | tee "$RUNNER_TEMP/ports"
+          test "$(grep -c -- '->' "$RUNNER_TEMP/ports")" = 1
+          grep -q '^orbit-production-web-1 127.0.0.1:3000->3000/tcp$' "$RUNNER_TEMP/ports"
+          if curl -sS --max-time 3 http://127.0.0.1:8000/health; then exit 1; fi
+          if (exec 3<>/dev/tcp/127.0.0.1/5432) 2> /dev/null; then exit 1; fi
+          echo "API (8000) and database (5432) are not reachable from the host"
+      # Then publish the API on 127.0.0.1 (CI-only override) so the smoke test can use it.
       - run: docker compose up --build --detach --wait
       - name: Create the owner
         run: |

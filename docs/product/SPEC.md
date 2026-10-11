@@ -197,6 +197,8 @@ blocked attempt gets 429 with `Retry-After` and the login page says how long to 
 Browsers that have signed in before are counted on their own, so strangers cannot lock
 the owner out of them, and `clear-login-blocks` lifts every block from the server.
 Expired sessions and old sign-in records are purged on sign-in and by `purge-expired`.
+Accepted limitation: someone who knows the owner's email can keep a browser that has
+never signed in waiting, up to 15 minutes at a time; known browsers are unaffected.
 
 **Data export.** "Download my data" gives the owner a JSON file with their account
 details, every shopping item, and every habit with its full check-in history, following

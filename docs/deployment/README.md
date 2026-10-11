@@ -114,6 +114,13 @@ docker compose -f compose.production.yml exec api python -m app.cli clear-login-
 Forgot the password: `... exec api python -m app.cli set-password` (signs out every
 session). Limits are set with `ORBIT_LOGIN_*` in `.env`.
 
+**Known limitation.** Someone who knows your email address can keep making a browser
+that has never signed in wait, up to 15 minutes at a time, for as long as they keep
+trying. Blocks always end, browsers you have signed in with before are not affected, and
+`clear-login-blocks` lifts every block at once. If Orbit is reachable from the internet,
+sign in once from each device you use while all is quiet, or keep Orbit behind a VPN.
+Details: [ADR 0010](../decisions/0010-sign-in-throttling-and-known-devices.md).
+
 ## Housekeeping
 
 Each sign-in removes expired sessions and old sign-in records. To do it on a schedule as

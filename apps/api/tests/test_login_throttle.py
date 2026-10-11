@@ -196,6 +196,32 @@ def test_a_known_browser_signs_in_while_attackers_keep_the_account_blocked(clien
 
 
 @pytest.mark.integration
+def test_a_sustained_attack_never_locks_out_a_known_browser_and_every_block_ends(
+    client, owner, now
+):
+    """The accepted limitation (ADR 0010), at its worst: someone who knows the owner's
+    email re-blocks the account as soon as each block ends, for hours. A browser the
+    owner signed in with before gets in during every block, no block exceeds the cap,
+    and once the attacker stops, any browser signs in."""
+    device = attempt(client).json()["device_token"]
+    waits = []
+    for _ in range(10):
+        for _ in range(10):  # wrong passwords until the account is blocked again
+            response = attempt(client, password=WRONG)
+            if response.status_code == 429:
+                break
+            assert response.status_code == 401
+        wait = retry_after(response)
+        waits.append(wait)
+        assert attempt(client).status_code == 429  # a new browser waits, even with the password
+        assert attempt(client, device_token=device).status_code == 200
+        now.advance(wait)
+
+    assert waits == [30, 60, 120, 240, 480, 900, 900, 900, 900, 900]
+    assert attempt(client).status_code == 200
+
+
+@pytest.mark.integration
 def test_a_device_has_its_own_limit(client, owner, now):
     device = attempt(client).json()["device_token"]
     for _ in range(5):
