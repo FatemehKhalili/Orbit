@@ -24,7 +24,7 @@ describe("loginWithApi", () => {
       user: {},
     });
 
-    const result = await loginWithApi("owner@example.com", "pw", { env, fetchImpl });
+    const result = await loginWithApi("owner@example.com", "pw", {}, { env, fetchImpl });
 
     expect(result).toEqual({
       ok: true,
@@ -39,7 +39,7 @@ describe("loginWithApi", () => {
   });
 
   it.each([401, 422])("reports invalid credentials for HTTP %i", async (status) => {
-    const result = await loginWithApi("a@example.com", "pw", {
+    const result = await loginWithApi("a@example.com", "pw", {}, {
       env,
       fetchImpl: respondWith(status),
     });
@@ -48,11 +48,72 @@ describe("loginWithApi", () => {
 
   it("reports the API as unavailable on server errors, network errors and missing config", async () => {
     const unavailable = { ok: false, reason: "unavailable" };
-    expect(await loginWithApi("a", "b", { env, fetchImpl: respondWith(500) })).toEqual(unavailable);
-    expect(await loginWithApi("a", "b", { env, fetchImpl: unreachable() })).toEqual(unavailable);
-    expect(await loginWithApi("a", "b", { env: {}, fetchImpl: respondWith(200) })).toEqual(
+    expect(await loginWithApi("a", "b", {}, { env, fetchImpl: respondWith(500) })).toEqual(
       unavailable,
     );
+    expect(await loginWithApi("a", "b", {}, { env, fetchImpl: unreachable() })).toEqual(
+      unavailable,
+    );
+    expect(await loginWithApi("a", "b", {}, { env: {}, fetchImpl: respondWith(200) })).toEqual(
+      unavailable,
+    );
+  });
+
+  it("sends the device token and client address when it has them", async () => {
+    const fetchImpl = respondWith(200, {
+      token: "raw-token",
+      expires_at: "2026-11-02T06:00:00+00:00",
+      device_token: null,
+    });
+
+    const result = await loginWithApi(
+      "owner@example.com",
+      "pw",
+      { deviceToken: "device-1", clientIp: "203.0.113.7" },
+      { env, fetchImpl },
+    );
+
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1]?.body))).toEqual({
+      email: "owner@example.com",
+      password: "pw",
+      device_token: "device-1",
+      client_ip: "203.0.113.7",
+    });
+    expect(result).toEqual({
+      ok: true,
+      token: "raw-token",
+      expiresAt: new Date("2026-11-02T06:00:00Z"),
+    });
+  });
+
+  it("returns a new device token from the API", async () => {
+    const fetchImpl = respondWith(200, {
+      token: "raw-token",
+      expires_at: "2026-11-02T06:00:00+00:00",
+      device_token: "new-device",
+    });
+    const result = await loginWithApi("a@example.com", "pw", {}, { env, fetchImpl });
+    expect(result).toMatchObject({ ok: true, deviceToken: "new-device" });
+  });
+
+  it("reports a throttled sign-in with the API's Retry-After", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response("{}", { status: 429, headers: { "Retry-After": "120" } }),
+    );
+    expect(await loginWithApi("a@example.com", "pw", {}, { env, fetchImpl })).toEqual({
+      ok: false,
+      reason: "throttled",
+      retryAfterSeconds: 120,
+    });
+  });
+
+  it("assumes a minute when a 429 has no usable Retry-After", async () => {
+    const fetchImpl = respondWith(429);
+    expect(await loginWithApi("a@example.com", "pw", {}, { env, fetchImpl })).toEqual({
+      ok: false,
+      reason: "throttled",
+      retryAfterSeconds: 60,
+    });
   });
 });
 
