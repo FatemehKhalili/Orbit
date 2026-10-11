@@ -2,6 +2,8 @@
 
     python -m app.cli create-owner --email you@example.com --name "Your Name"
     python -m app.cli set-password
+    python -m app.cli clear-login-blocks
+    python -m app.cli purge-expired
 
 Passwords are read from an interactive prompt, or from standard input with
 --password-stdin. They are never accepted as arguments, which would leave them in shell
@@ -16,10 +18,13 @@ from typing import TextIO
 
 from sqlalchemy.orm import Session
 
+from app import clock
+from app.auth import throttle
 from app.auth.service import (
     OwnerAlreadyExistsError,
     OwnerNotFoundError,
     create_owner,
+    purge_expired,
     set_owner_password,
 )
 from app.config import get_settings
@@ -58,8 +63,28 @@ def main(
     )
     reset.add_argument("--password-stdin", action="store_true")
 
+    commands.add_parser(
+        "clear-login-blocks",
+        help="Lift every sign-in block and forget failed attempts (ADR 0010)",
+    )
+    commands.add_parser(
+        "purge-expired",
+        help="Delete expired sessions and devices and old sign-in throttle state",
+    )
+
     args = parser.parse_args(argv)
     factory = session_factory or _default_session_factory()
+
+    if args.command == "clear-login-blocks":
+        with factory() as session:
+            cleared = throttle.clear_all(session)
+        print(f"Cleared sign-in throttle state ({cleared} entries)")
+        return 0
+    if args.command == "purge-expired":
+        with factory() as session:
+            counts = purge_expired(session, now=clock.utc_now())
+        print("Purged " + ", ".join(f"{count} {name}" for name, count in counts.items()))
+        return 0
 
     try:
         password = _read_password(args.password_stdin, stdin)

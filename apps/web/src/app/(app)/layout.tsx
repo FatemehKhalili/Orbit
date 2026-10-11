@@ -27,6 +27,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <span className="text-muted-foreground" data-testid="current-user">
               {user.displayName}
             </span>
+            {/* A plain link, not <Link>: a file download must never be prefetched. */}
+            <a
+              href="/account/export"
+              className="text-muted-foreground hover:text-foreground"
+              data-testid="export-link"
+            >
+              Download my data
+            </a>
             <form action={logout}>
               <Button type="submit" variant="outline" size="sm">
                 Sign out

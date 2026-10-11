@@ -9,8 +9,12 @@ from app.config import Settings
 
 
 def create_database_engine(settings: Settings) -> Engine:
-    # create_engine does not connect; the first query does.
-    return create_engine(settings.database_url.get_secret_value(), pool_pre_ping=True)
+    # create_engine does not connect; the first query does. hide_parameters keeps bound
+    # values (password hashes, emails, token hashes) out of database error messages, and
+    # so out of logs (ADR 0009).
+    return create_engine(
+        settings.database_url.get_secret_value(), pool_pre_ping=True, hide_parameters=True
+    )
 
 
 def create_session_factory(engine: Engine) -> sessionmaker[Session]:

@@ -1,16 +1,21 @@
 """Owner account and session operations. HTTP and CLI layers call these."""
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlalchemy import delete, func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.auth import throttle
 from app.auth.passwords import hash_password, needs_rehash, validate_new_password, verify_password
 from app.auth.tokens import generate_token, hash_token
-from app.models import AuthSession, User
+from app.config import Settings
+from app.models import AuthSession, LoginDevice, User
+
+logger = logging.getLogger("orbit.auth")
 
 _email_adapter = TypeAdapter(EmailStr)
 
@@ -112,6 +117,119 @@ def resolve_session(session: Session, token: str) -> AuthSession | None:
             AuthSession.expires_at > datetime.now(UTC),
         )
     )
+
+
+# How long a browser stays "known" after its last successful sign-in (ADR 0010).
+DEVICE_TTL = timedelta(days=365)
+
+
+@dataclass(frozen=True)
+class SignInResult:
+    """Exactly one of: a session, a refusal (throttled), or neither (wrong credentials)."""
+
+    issued: IssuedSession | None = None
+    refusal: throttle.Refusal | None = None
+    # The device token for the browser to keep (new, or its own one again so the cookie's
+    # lifetime is renewed); None unless signed in.
+    device_token: str | None = None
+
+
+def sign_in(
+    session: Session,
+    *,
+    email: str,
+    password: str,
+    device_token: str | None,
+    client_ip: str | None,
+    settings: Settings,
+    now: datetime,
+) -> SignInResult:
+    """Throttle, check the password, and start a session (ADR 0006, ADR 0010)."""
+    try:
+        email_key = normalize_email(email)
+    except ValueError:
+        email_key = email.strip().lower()
+
+    device = _known_device(session, email_key, device_token, now=now)
+    if device is not None:
+        buckets = [throttle.device_bucket(device.token_hash, settings)]
+    else:
+        buckets = [throttle.account_bucket(email_key, settings)]
+        if client_ip:
+            buckets.append(throttle.ip_bucket(client_ip, settings))
+        buckets.append(throttle.global_bucket(settings))
+
+    refusal = throttle.count_attempt(session, buckets, now=now, settings=settings)
+    if refusal is not None:
+        return SignInResult(refusal=refusal)
+
+    user = authenticate(session, email=email, password=password)
+    if user is None:
+        session.commit()
+        return SignInResult()
+
+    throttle.clear(session, buckets)
+    if device is not None:
+        device.last_used_at = now
+        device.expires_at = now + DEVICE_TTL
+        returned_device_token = device_token  # sent back so the cookie is renewed too
+    else:
+        returned_device_token = generate_token()
+        session.add(
+            LoginDevice(
+                user_id=user.id,
+                token_hash=hash_token(returned_device_token),
+                last_used_at=now,
+                expires_at=now + DEVICE_TTL,
+            )
+        )
+    ttl = timedelta(days=settings.session_ttl_days)
+    issued = start_session(session, user, ttl=ttl)  # commits
+    # Housekeeping rides along with each sign-in, in its own transaction after the
+    # sign-in is safe, so it holds no throttle locks and cannot fail the sign-in.
+    try:
+        _delete_expired(session, now=now)
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        logger.warning("purging expired sign-in data failed; it is retried on the next sign-in")
+    return SignInResult(issued=issued, device_token=returned_device_token)
+
+
+def _known_device(
+    session: Session, email_key: str, device_token: str | None, *, now: datetime
+) -> LoginDevice | None:
+    """The device behind `device_token`, if it is live and belongs to this email's user."""
+    if not device_token:
+        return None
+    return session.scalar(
+        select(LoginDevice)
+        .join(User, User.id == LoginDevice.user_id)
+        .where(
+            LoginDevice.token_hash == hash_token(device_token),
+            LoginDevice.expires_at > now,
+            User.email == email_key,
+        )
+    )
+
+
+def purge_expired(session: Session, *, now: datetime) -> dict[str, int]:
+    """Housekeeping for the admin CLI: expired sessions and devices, stale throttle rows."""
+    counts = _delete_expired(session, now=now)
+    session.commit()
+    return counts
+
+
+def _delete_expired(session: Session, *, now: datetime) -> dict[str, int]:
+    return {
+        "sessions": session.execute(
+            delete(AuthSession).where(AuthSession.expires_at <= now)
+        ).rowcount,
+        "devices": session.execute(
+            delete(LoginDevice).where(LoginDevice.expires_at <= now)
+        ).rowcount,
+        "login throttles": throttle.purge_stale(session, now=now),
+    }
 
 
 def end_session(session: Session, auth_session: AuthSession) -> None:

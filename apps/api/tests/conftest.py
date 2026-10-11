@@ -49,7 +49,10 @@ def db_settings(monkeypatch) -> Iterator[Settings]:
     engine = create_database_engine(test_settings)
     with engine.begin() as connection:
         connection.execute(
-            text("TRUNCATE users, sessions, shopping_items, habits, habit_check_ins CASCADE")
+            text(
+                "TRUNCATE users, sessions, login_throttles, login_devices,"
+                " shopping_items, habits, habit_check_ins CASCADE"
+            )
         )
     engine.dispose()
 
