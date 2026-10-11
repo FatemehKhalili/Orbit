@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app import clock
 from app.auth import passwords, throttle
@@ -167,12 +167,22 @@ def test_email_case_and_spacing_share_one_bucket(client, owner, now):
 
 
 @pytest.mark.integration
-def test_a_successful_sign_in_gives_the_browser_a_device_token_once(client, owner, now):
+def test_a_known_browser_keeps_its_device_token_and_it_is_renewed(
+    client, owner, now, session_factory
+):
     first = attempt(client).json()
     assert len(first["device_token"]) >= 43
+    now.advance(timedelta(days=300).total_seconds())
+
     again = attempt(client, device_token=first["device_token"]).json()
-    assert again["device_token"] is None
-    assert first["device_token"] not in again.values()
+
+    # The same token comes back, so the web app renews the cookie's lifetime, and the
+    # device now lasts a year from this sign-in, not the first.
+    assert again["device_token"] == first["device_token"]
+    with session_factory() as session:
+        devices = session.scalars(select(LoginDevice)).all()
+    assert len(devices) == 1
+    assert devices[0].expires_at == clock.utc_now() + timedelta(days=365)
 
 
 @pytest.mark.integration
@@ -247,6 +257,26 @@ def test_the_global_budget_caps_spraying_across_many_emails(small_global_client,
     retry_after(attempt(client))
     # ...but not a browser the owner already uses.
     assert attempt(client, device_token=device).status_code == 200
+
+
+@pytest.mark.integration
+def test_attempts_refused_by_one_bucket_are_not_counted_in_the_others(
+    small_global_client, owner, now, session_factory
+):
+    client = small_global_client
+    for n in range(3):
+        attempt(client, email=f"spray{n}@example.com", password=WRONG)
+    # While strangers keep the instance blocked, the owner tries again and again...
+    for _ in range(10):
+        retry_after(attempt(client))
+    # ...and none of it counted against the owner's own account.
+    owner_key = throttle.account_bucket(OWNER_EMAIL, client.app.state.settings).key
+    with session_factory() as session:
+        row = session.get(LoginThrottle, owner_key)
+    assert row is None or (row.failures == 0 and row.blocked_until is None)
+    # Once the global block ends, the owner signs in at once.
+    now.advance(31)
+    assert attempt(client).status_code == 200
 
 
 @pytest.mark.integration
@@ -339,7 +369,7 @@ def test_cli_purge_expired_keeps_live_state(client, owner, now, session_factory,
     with session_factory() as session:
         assert session.scalar(select(func.count()).select_from(LoginThrottle)) == 0
         assert session.scalar(select(func.count()).select_from(LoginDevice)) == 1
-    assert attempt(client, device_token=live_device).json()["device_token"] is None
+    assert attempt(client, device_token=live_device).json()["device_token"] == live_device
 
 
 @pytest.mark.integration
@@ -348,7 +378,11 @@ def test_sign_in_purges_expired_sessions_and_stale_throttle_state(
 ):
     attempt(client)
     attempt(client, email=UNKNOWN_EMAIL, password=WRONG)
-    now.advance(timedelta(days=60).total_seconds())  # past the 30-day session and a day
+    long_ago = START - timedelta(days=60)
+    with session_factory() as session:
+        session.execute(update(AuthSession).values(expires_at=long_ago))
+        session.execute(update(LoginThrottle).values(last_attempt_at=long_ago))
+        session.commit()
 
     assert attempt(client).status_code == 200
 

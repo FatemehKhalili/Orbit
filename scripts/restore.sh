@@ -57,7 +57,7 @@ compose exec -T db true 2> /dev/null \
 running=$(compose ps --status running --services 2> /dev/null | grep -E '^(api|web)$' || true)
 [ -z "$running" ] || die "stop the app first, so nothing writes during the restore:
   docker compose -f $compose_file stop web api"
-compose exec -T db pg_restore --list < "$file" > /dev/null \
+compose exec -T db pg_restore -f /dev/null < "$file" \
   || die "$name is not a readable backup. Nothing was restored."
 
 db=$(compose exec -T db sh -c 'printf %s "$POSTGRES_DB"')
@@ -96,7 +96,8 @@ compose exec -T db sh -c \
   restore "$incoming" < "$file" || die "pg_restore failed; the current database was not changed"
 
 # 5. Swap: the restored database takes the name the app uses.
-psql_admin > /dev/null <<SQL
+# One transaction: both renames happen, or neither does.
+psql_admin -1 > /dev/null <<SQL
 SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$db' AND pid <> pg_backend_pid();
 ALTER DATABASE "$db" RENAME TO "$previous";
 ALTER DATABASE "$incoming" RENAME TO "$db";

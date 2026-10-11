@@ -5,7 +5,7 @@ export type LoginState = { error?: string; email?: string };
 type Dependencies = {
   login: (email: string, password: string) => Promise<LoginResult>;
   startSession: (token: string, expiresAt: Date) => Promise<void>;
-  /** Keeps a new device token in the browser, so its sign-ins are throttled on their own. */
+  /** Keeps (or renews) the device token in the browser, so its sign-ins are throttled on their own. */
   rememberDevice: (deviceToken: string) => Promise<void>;
 };
 

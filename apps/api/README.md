@@ -68,8 +68,9 @@ See [ADR 0006](../../docs/decisions/0006-owner-account-and-sessions.md).
 
 Sign-in is throttled per email (known or not), per client address (`client_ip`, which
 the web app sends only behind a trusted proxy) and across the instance; a blocked attempt
-is refused before the password is checked. `device_token` is returned once, on a browser's
-first sign-in; sending it back later counts that browser's attempts on their own, so a
+is refused before the password is checked. `device_token` comes back with every successful
+sign-in (new on a browser's first, its own again after that, so it is renewed); sending it
+back counts that browser's attempts on their own, so a
 blocked account never locks out a browser that signed in before. Only hashes of emails,
 addresses and device tokens are stored.
 See [ADR 0010](../../docs/decisions/0010-sign-in-throttling-and-known-devices.md).

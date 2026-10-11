@@ -82,46 +82,45 @@ class Refusal:
 def count_attempt(
     session: Session, buckets: list[Bucket], *, now: datetime, settings: Settings
 ) -> Refusal | None:
-    """Count one attempt in each bucket, in order. Returns a refusal at the first bucket
-    that is already blocked (later buckets are left untouched), or None to go ahead."""
-    for bucket in buckets:
-        retry_after = _count(session, bucket, now=now, settings=settings)
-        if retry_after is not None:
+    """Count one attempt in every bucket, or in none of them: if any bucket is blocked,
+    the attempt is refused (at the first blocked bucket, in order) and nothing is counted,
+    so a block in one bucket never adds failures to another."""
+    rows = [_lock(session, bucket, now=now) for bucket in buckets]
+    for bucket, row in zip(buckets, rows, strict=True):
+        if row.blocked_until is not None and row.blocked_until > now:
             session.commit()
-            return Refusal(bucket, retry_after)
+            return Refusal(bucket, max(1, math.ceil((row.blocked_until - now).total_seconds())))
+    for bucket, row in zip(buckets, rows, strict=True):
+        failures = 1 if row.last_attempt_at < now - FORGET_AFTER else row.failures + 1
+        seconds = block_seconds(failures, bucket.free, settings)
+        session.execute(
+            update(LoginThrottle)
+            .where(LoginThrottle.key == bucket.key)
+            .values(
+                failures=failures,
+                last_attempt_at=now,
+                blocked_until=now + timedelta(seconds=seconds) if seconds else None,
+            )
+        )
     session.commit()
     return None
 
 
-def _count(session: Session, bucket: Bucket, *, now: datetime, settings: Settings) -> int | None:
-    """Count the attempt in one bucket; the seconds to wait if it was already blocked."""
-    # Make sure the row exists, then lock it until the caller commits. Concurrent attempts
-    # on the same bucket queue here, so each one sees the count the previous one left.
+def _lock(session: Session, bucket: Bucket, *, now: datetime) -> LoginThrottle:
+    """The bucket's row, created if needed and locked until the caller commits. Concurrent
+    attempts on the same bucket queue here, so each sees the count the previous one left.
+    Buckets are always locked in the same order (account or device, address, global)."""
     session.execute(
         insert(LoginThrottle)
         .values(key=bucket.key, failures=0, last_attempt_at=now, blocked_until=None)
         .on_conflict_do_nothing(index_elements=[LoginThrottle.key])
     )
-    row = session.execute(
-        select(LoginThrottle).where(LoginThrottle.key == bucket.key).with_for_update()
-    ).scalar_one()
-
-    if row.blocked_until is not None and row.blocked_until > now:
-        # Refused attempts are not counted, so a block never grows while it lasts.
-        return max(1, math.ceil((row.blocked_until - now).total_seconds()))
-
-    failures = 1 if row.last_attempt_at < now - FORGET_AFTER else row.failures + 1
-    seconds = block_seconds(failures, bucket.free, settings)
-    session.execute(
-        update(LoginThrottle)
+    return session.execute(
+        select(LoginThrottle)
         .where(LoginThrottle.key == bucket.key)
-        .values(
-            failures=failures,
-            last_attempt_at=now,
-            blocked_until=now + timedelta(seconds=seconds) if seconds else None,
-        )
-    )
-    return None
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one()
 
 
 def clear(session: Session, buckets: list[Bucket]) -> None:

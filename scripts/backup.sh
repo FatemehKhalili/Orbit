@@ -65,8 +65,8 @@ compose exec -T db sh -c \
   'pg_dump --format=custom --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   > "$partial" || die "pg_dump failed; no backup was written"
 [ -s "$partial" ] || die "pg_dump wrote nothing; no backup was written"
-# Read the archive back before calling it a backup.
-compose exec -T db pg_restore --list < "$partial" > /dev/null \
+# Read the whole archive back, data included, before calling it a backup.
+compose exec -T db pg_restore -f /dev/null < "$partial" \
   || die "the dump cannot be read back; no backup was written"
 
 mv "$partial" "$file"

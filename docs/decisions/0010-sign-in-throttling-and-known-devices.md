@@ -46,8 +46,9 @@ blocked, `blocked_until`. Each sign-in attempt counts against every bucket it be
 - **A blocked attempt is refused before the password is checked**: `429` with
   `Retry-After`, the same answer for an existing and a non-existent email, and no Argon2
   work. A correct password is refused too while blocked; otherwise the block would not
-  slow down guessing. Refused attempts are not counted, so hammering a block does not
-  lengthen it.
+  slow down guessing. Refused attempts are not counted in any bucket, so hammering a block
+  does not lengthen it, and a blocked instance or address never adds failures to the
+  owner's account. An attempt is counted in all its buckets or in none.
 - **Success clears** the attempt's own buckets, and takes one off the global count.
 - **Counting is exact under concurrency**: each bucket row is locked (`SELECT … FOR
   UPDATE`) while it is updated, so parallel guesses cannot slip through between a read and
@@ -70,6 +71,8 @@ buckets. So:
 - Attackers who fill the account and global buckets block every browser that has never
   signed in, but not the owner's own browsers. A browser that has signed in once stays
   usable for a year after its last sign-in, whatever strangers do.
+- Each sign-in from a known browser sends its token back, so the cookie is renewed
+  along with the device's expiry.
 - A stolen device token gives nothing without the password, and its own bucket still
   slows guessing with it.
 - A new browser, or one whose cookies were cleared, is in the same position as a

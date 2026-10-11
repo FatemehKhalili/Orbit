@@ -175,19 +175,25 @@ jobs:
           .github/scripts/orbit-data.sh token > /dev/null
           docker compose exec -T api alembic check
       # `! cmd` does not stop a step under `set -e`, hence the if/exit form.
+      # With --force and the name typed, so only the check under test can refuse.
       - name: Restore refuses to run while the app is up
-        run: if ./scripts/restore.sh "$BACKUPS"/orbit-*.dump; then exit 1; fi
+        run: |
+          if echo orbit | ./scripts/restore.sh --force "$BACKUPS"/orbit-*.dump 2> "$RUNNER_TEMP/err"; then exit 1; fi
+          grep -q "stop the app first" "$RUNNER_TEMP/err"
       - name: Restore refuses a damaged file
         run: |
           docker compose stop web api
           cp "$BACKUPS"/orbit-*.dump "$RUNNER_TEMP/damaged.dump"
           sed 's/ .*/  damaged.dump/' "$BACKUPS"/orbit-*.dump.sha256 > "$RUNNER_TEMP/damaged.dump.sha256"
           printf x >> "$RUNNER_TEMP/damaged.dump"
-          if ./scripts/restore.sh "$RUNNER_TEMP/damaged.dump"; then exit 1; fi
+          if echo orbit | ./scripts/restore.sh --force "$RUNNER_TEMP/damaged.dump" 2> "$RUNNER_TEMP/err"; then exit 1; fi
+          grep -q "does not match its checksum" "$RUNNER_TEMP/err"
       - name: Restore never replaces data without --force and the typed name
         run: |
-          if ./scripts/restore.sh "$BACKUPS"/orbit-*.dump; then exit 1; fi
-          if echo wrong | ./scripts/restore.sh --force "$BACKUPS"/orbit-*.dump; then exit 1; fi
+          if ./scripts/restore.sh "$BACKUPS"/orbit-*.dump 2> "$RUNNER_TEMP/err"; then exit 1; fi
+          grep -q "refusing to replace it" "$RUNNER_TEMP/err"
+          if echo wrong | ./scripts/restore.sh --force "$BACKUPS"/orbit-*.dump 2> "$RUNNER_TEMP/err"; then exit 1; fi
+          grep -q "not confirmed" "$RUNNER_TEMP/err"
           echo orbit | ./scripts/restore.sh --force "$BACKUPS"/orbit-*.dump
           ./scripts/db-fingerprint.sh | diff "$RUNNER_TEMP/fingerprint-before.txt" -
           docker compose exec -T db psql -U orbit -d postgres -tAc \

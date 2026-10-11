@@ -31,7 +31,7 @@ your password offline. Treat it like the server itself:
 ```
 
 It works while Orbit runs and takes one consistent snapshot. It writes
-`orbit-<UTC time>.dump` and `orbit-<UTC time>.dump.sha256`, and reads the dump back
+`orbit-<UTC time>.dump` and `orbit-<UTC time>.dump.sha256`, and reads the whole dump back
 before reporting success. A dump from the development setup:
 `ORBIT_COMPOSE_FILE=docker-compose.yml ./scripts/backup.sh`.
 
@@ -41,8 +41,10 @@ Orbit has no background jobs; use the host's scheduler. With cron (`crontab -e`)
 at 03:15, keeping the newest 14:
 
 ```cron
-15 3 * * *  cd /srv/orbit && ./scripts/backup.sh --keep 14 >> ~/orbit-backups/backup.log 2>&1
+15 3 * * *  cd /srv/orbit && ./scripts/backup.sh --keep 14 2>&1 | logger -t orbit-backup
 ```
+
+The output goes to the system log (`journalctl -t orbit-backup`, or `/var/log/syslog`).
 
 A systemd timer works the same way. Check the log now and then: a backup that silently
 stopped is the most common way to lose data.

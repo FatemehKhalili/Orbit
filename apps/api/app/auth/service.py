@@ -1,11 +1,12 @@
 """Owner account and session operations. HTTP and CLI layers call these."""
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlalchemy import delete, func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth import throttle
@@ -13,6 +14,8 @@ from app.auth.passwords import hash_password, needs_rehash, validate_new_passwor
 from app.auth.tokens import generate_token, hash_token
 from app.config import Settings
 from app.models import AuthSession, LoginDevice, User
+
+logger = logging.getLogger("orbit.auth")
 
 _email_adapter = TypeAdapter(EmailStr)
 
@@ -126,7 +129,8 @@ class SignInResult:
 
     issued: IssuedSession | None = None
     refusal: throttle.Refusal | None = None
-    # A new device token for the browser to keep; None when it already has a valid one.
+    # The device token for the browser to keep (new, or its own one again so the cookie's
+    # lifetime is renewed); None unless signed in.
     device_token: str | None = None
 
 
@@ -165,24 +169,31 @@ def sign_in(
         return SignInResult()
 
     throttle.clear(session, buckets)
-    new_device_token = None
     if device is not None:
         device.last_used_at = now
         device.expires_at = now + DEVICE_TTL
+        returned_device_token = device_token  # sent back so the cookie is renewed too
     else:
-        new_device_token = generate_token()
+        returned_device_token = generate_token()
         session.add(
             LoginDevice(
                 user_id=user.id,
-                token_hash=hash_token(new_device_token),
+                token_hash=hash_token(returned_device_token),
                 last_used_at=now,
                 expires_at=now + DEVICE_TTL,
             )
         )
-    _delete_expired(session, now=now)  # housekeeping rides along with each sign-in
     ttl = timedelta(days=settings.session_ttl_days)
     issued = start_session(session, user, ttl=ttl)  # commits
-    return SignInResult(issued=issued, device_token=new_device_token)
+    # Housekeeping rides along with each sign-in, in its own transaction after the
+    # sign-in is safe, so it holds no throttle locks and cannot fail the sign-in.
+    try:
+        _delete_expired(session, now=now)
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        logger.warning("purging expired sign-in data failed; it is retried on the next sign-in")
+    return SignInResult(issued=issued, device_token=returned_device_token)
 
 
 def _known_device(

@@ -138,7 +138,8 @@ Every release's notes say whether anything special applies. The procedure:
 2. Fetch and check out the new release: `git fetch --tags && git checkout v0.X.0-phaseX`.
 3. Rebuild and start: `docker compose -f compose.production.yml up -d --build`
    (add `--profile https` if you use it). The migrate step updates the database before
-   the new API starts. If it fails, the API stays down and the data stays as it was.
+   the new API starts. If it fails, the new API never starts, and the database is left
+   as the migration found it (each migration runs in a transaction); roll back below.
 4. Check: `docker compose -f compose.production.yml ps` shows everything healthy, and you
    can sign in and see your data.
 

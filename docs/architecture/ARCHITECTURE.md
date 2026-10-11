@@ -128,7 +128,7 @@ Browser ──cookie──▶ web: proxy (cookie present?) ─▶ layout/page �
 | `habits`, `habit_check_ins` | API database | Habits (`archived_at` null while active) and one row per habit per day done; a composite key keeps a check-in's owner equal to its habit's, and deleting a habit deletes its check-ins |
 | `login_throttles` | API database | Failure counts and blocks per bucket, keyed by hashes only ([ADR 0010](../decisions/0010-sign-in-throttling-and-known-devices.md)) |
 | `login_devices` | API database | SHA-256 hash of each known-browser token, its user and expiry |
-| `POST /auth/login` | API | Email + password (+ device token, client address) → token, expiry and a new device token; same 401 for every wrong password, 429 with `Retry-After` while throttled |
+| `POST /auth/login` | API | Email + password (+ device token, client address) → token, expiry and the device token (new or renewed); same 401 for every wrong password, 429 with `Retry-After` while throttled |
 | `POST /auth/logout` | API | Revokes the calling session (204) |
 | `GET /auth/me` | API | The signed-in owner, or 401 |
 | `GET /account/export` | API | The owner's data as JSON (docs/export/), `no-store` |

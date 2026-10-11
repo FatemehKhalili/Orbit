@@ -40,7 +40,7 @@ class LoginResponse(BaseModel):
     token: str
     expires_at: datetime
     user: UserOut
-    # Set only when this browser should start keeping a new device token.
+    # The device token for the browser to keep: a new one, or its own again to renew it.
     device_token: str | None
 
 
