@@ -59,16 +59,18 @@ export async function apiFetch(
  * Why a request failed, in the terms callers act on:
  * - unauthenticated: 401, the session is missing, expired or revoked (sign in again)
  * - not_found: 404, including another user's record (ADR 0007)
+ * - conflict: 409, the request is not allowed in the record's current state (ADR 0007)
  * - invalid: 422, the API refused the input
  * - unavailable: anything else, including the API being down
  */
-export type ApiError = "unauthenticated" | "not_found" | "invalid" | "unavailable";
+export type ApiError = "unauthenticated" | "not_found" | "conflict" | "invalid" | "unavailable";
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiError };
 
 const ERRORS_BY_STATUS: Record<number, ApiError> = {
   401: "unauthenticated",
   404: "not_found",
+  409: "conflict",
   422: "invalid",
 };
 

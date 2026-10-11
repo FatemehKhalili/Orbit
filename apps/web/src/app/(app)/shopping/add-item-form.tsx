@@ -2,11 +2,11 @@
 
 import { useActionState } from "react";
 
+import { FormMessage } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
 import { IDLE } from "@/lib/shopping";
 
 import { addItem } from "./actions";
-import { FormMessage } from "./form-message";
 import { ItemFields } from "./item-fields";
 
 export function AddItemForm() {

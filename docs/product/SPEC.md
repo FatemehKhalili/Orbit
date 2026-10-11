@@ -15,7 +15,7 @@ and self-hostable, so a person's life data stays under their control.
 | Dashboard | The centre: a summary of what matters across all modules.    |
 | Finance   | Track money in and out.                                      |
 | Calendar  | See and plan time.                                           |
-| Habits    | Build and track routines.                                    |
+| Habits    | Build and track routines (Phase 5, see below).               |
 | Shopping  | Keep a shopping list (Phase 4, see below).                   |
 | Wishlist  | Collect things you want, for yourself or as gift ideas.      |
 
@@ -39,7 +39,8 @@ and self-hostable, so a person's life data stays under their control.
 | 2     | Data foundations: Alembic migrations, model base, sessions, `uv.lock`, Dependabot | Complete    |
 | 3     | Owner account and app shell: sign-in, sessions, signed-in layout and navigation, module placeholders, production image checks in CI | Complete    |
 | 4     | Shopping: the first module, one personal shopping list per owner     | Complete    |
-| 5+    | To be defined                                                         | Not started |
+| 5     | Habits: daily habits checked off over the last seven days, archive and delete, one instance timezone | In progress |
+| 6+    | To be defined                                                         | Not started |
 
 Phase 1 delivers no product features. The web app shows a placeholder with the six
 modules and the backend's health.
@@ -107,3 +108,58 @@ Out of scope for Phase 4: several lists, categories, prices, stores, priorities,
 recurring items, sharing, reordering, a Dashboard summary, pagination, bulk actions such
 as "clear checked items", undo, and a delete confirmation step. The open Dependabot
 updates and login rate limiting stay separate.
+
+## Phase 5: Habits
+
+Phase 5 adds the second module. Every other module stays a placeholder, and the
+Dashboard and navigation do not change.
+
+**What the owner can do:** keep a list of daily habits. Add a habit, rename it or change
+its notes, and check it off (or un-check it) for today or any of the six days before. A
+habit they no longer track can be archived: it leaves the list, keeps its history and can
+be restored. Only an archived habit can be deleted, and deleting it removes its history
+for good.
+
+**Habit:**
+
+| Field         | Required | Rules                                                     |
+| ------------- | -------- | --------------------------------------------------------- |
+| `name`        | yes      | 1 to 100 characters, trimmed                              |
+| `notes`       | no       | Up to 1,000 characters                                    |
+| `archived_at` | no       | Empty while the habit is active                           |
+
+A check-in is one calendar day on which a habit was done; a habit has at most one per
+day. Each habit and check-in also has an ID, its owner and its creation and update times.
+
+**Rules:**
+
+- Every habit is daily. There are no schedules, targets or streaks.
+- "Today" is the calendar date in one instance-wide timezone, `ORBIT_TIMEZONE` (an IANA
+  name, default UTC). The API refuses to start with an unknown zone. Calendar and Finance
+  will use the same convention. See
+  [ADR 0008](../decisions/0008-dates-and-the-instance-timezone.md).
+- Check-ins can be added or removed for today and the six days before, and for no other
+  day. Older history is kept but not shown or changed.
+- An archived habit is read-only: its name, notes and check-ins cannot change until it is
+  restored (409). Deleting an active habit is refused (409); it must be archived first.
+  The API enforces both rules, not only the pages.
+
+**Security:** as in Phase 4, every query and change is limited to the signed-in owner's
+own habits, another user's habit is a 404, and a check-in's owner always matches its
+habit's owner (a database constraint).
+
+**Without JavaScript:** every form (add, edit, check-in, archive, restore, delete) works
+as a plain form post, as in Phase 4.
+
+**Testing:** API tests cover every route, validation, archive and delete rules, the
+seven-day window across a timezone day boundary, races with a concurrent delete, and
+ownership with a second user; web unit tests cover the API client, form logic and the
+seven-day strip (including a web server in another timezone); the smoke test adds a
+habit, checks and un-checks today, archives, restores and deletes it through the real
+forms.
+
+Out of scope for Phase 5: streaks, statistics and charts, schedules other than daily,
+targets or measurable habits, notes per check-in, history beyond seven days in the
+pages, reminders, a timezone per user or habit, categories, reordering, a Dashboard
+summary, Calendar integration, pagination, bulk actions, undo and a delete confirmation
+step.

@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
+import { FormMessage } from "@/components/form-message";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { IDLE } from "@/lib/shopping";
 import type { ShoppingItem } from "@/lib/shopping-api";
 
 import { editItem } from "../../actions";
-import { FormMessage } from "../../form-message";
 import { ItemFields } from "../../item-fields";
 
 export function EditItemForm({ item }: { item: ShoppingItem }) {

@@ -53,6 +53,13 @@ describe("readItemFields and validateItem", () => {
     expect(validateItem(fields)).toBe(error);
   });
 
+  // The API counts characters (code points); an emoji is one, not two UTF-16 units.
+  it("counts an emoji as one character, as the API does", () => {
+    const fields = { name: "🍎".repeat(200), quantity: "", notes: "" };
+    expect(typeof validateItem(fields)).toBe("object");
+    expect(validateItem({ ...fields, name: "🍎".repeat(201) })).toBe(SHOPPING_ERRORS.nameTooLong);
+  });
+
   it("accepts the longest allowed values", () => {
     const fields = { name: "n".repeat(200), quantity: "q".repeat(50), notes: "x".repeat(1000) };
     expect(typeof validateItem(fields)).toBe("object");

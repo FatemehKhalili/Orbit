@@ -12,7 +12,8 @@ one place.
 > (data foundations: migrations, model base, locked dependencies) is complete, tagged
 > `v0.2.0-phase2`. Phase 3 (owner account and app shell: sign-in, sessions, navigation) is
 > complete, tagged `v0.3.0-phase3`. Phase 4 (Shopping, the first module) is complete,
-> tagged `v0.4.0-phase4`. The other modules are placeholders.
+> tagged `v0.4.0-phase4`. Phase 5 (Habits) is in progress. The other modules are
+> placeholders.
 
 ## MVP modules
 
@@ -94,9 +95,10 @@ CI runs on pushes to `main` and on pull requests (`.github/workflows/ci.yml`):
 | Compose smoke test  | Starts db, api and web, runs `scripts/smoke-test.sh`, then `alembic check` |
 
 Coverage: API health, configuration, database sessions, migrations, sign-in, sessions, the
-one-owner rule, the admin CLI, and Shopping including ownership with a second user (138
-tests); web configuration, the API client, the session cookie, login and Shopping form
-logic and route protection (104 tests); and the end-to-end smoke test.
+one-owner rule, the admin CLI, the instance timezone, and Shopping and Habits including
+ownership with a second user (255 tests); web configuration, the API client, the session
+cookie, the shared form helpers, login, Shopping and Habits form logic, the seven-day strip
+and route protection (170 tests); and the end-to-end smoke test.
 
 Dependabot (`.github/dependabot.yml`) opens weekly update PRs for the API, the web app,
 GitHub Actions and Docker images.
@@ -124,6 +126,11 @@ Details in [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md
 
 All configuration comes from environment variables. `.env` files are git-ignored; only
 `*.env.example` files are committed, and they contain no real credentials.
+
+`ORBIT_TIMEZONE` (an IANA name such as `Europe/Berlin`, default `UTC`) decides which
+calendar day is "today" for the whole instance, for example which days a habit can be
+checked off. The API refuses to start with an unknown zone
+([ADR 0008](docs/decisions/0008-dates-and-the-instance-timezone.md)).
 
 Session cookies are `Secure` in production builds, so serve Orbit over HTTPS. Only for a
 plain-HTTP install on a trusted home network, set `ORBIT_INSECURE_COOKIES=true` on the web

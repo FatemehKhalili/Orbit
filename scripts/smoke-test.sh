@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Check a running stack end to end: health endpoints, then the owner signing in and out
 # through the web app's login form (proving web -> API -> database and the session cookie),
-# and using the Shopping list through its forms in between.
+# and using the Shopping list and Habits through their forms in between.
 # Usage: ./scripts/smoke-test.sh   (after `docker compose up`)
 #
 # Signing in needs an owner. With ORBIT_SMOKE_EMAIL and ORBIT_SMOKE_PASSWORD set, the
@@ -147,6 +147,50 @@ FORM="delete-item-$ID" submit_form "$WEB_URL/shopping" "$SESSION"
 [ "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SESSION" "$API_URL/shopping/items/$ID")" = 404 ] \
   || fail "web: deleting the item did not remove it"
 ok "web deletes an item"
+
+# Habits, through the same forms. "Today" is whatever the API says it is, in the
+# instance timezone (ADR 0008), so the script asks /time rather than its own clock.
+[ "$(curl -sS -o /dev/null -w '%{http_code}' "$API_URL/habits/habits")" = 401 ] \
+  || fail "api: /habits/habits must refuse requests without a session"
+ok "api refuses habit requests without a session"
+
+TODAY=$(api_get /time | sed -n 's/.*"today":"\([0-9-]*\)".*/\1/p')
+[ -n "$TODAY" ] || fail "api: /time did not report today's date"
+ok "api reports today as $TODAY"
+
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/habits") || fail "web: /habits failed"
+case $body in *'data-testid="habit-list"'*) ok "web habits page" ;; *) fail "web: /habits did not show the list" ;; esac
+
+HABIT="Smoke test reading $(date +%s)"
+FORM=add-habit-form submit_form "$WEB_URL/habits" "$SESSION" \
+  --form-string "name=$HABIT" --form-string "notes="
+HID=$(api_get /habits/habits | tr '{' '\n' | grep -F "\"name\":\"$HABIT\"" | sed -n 's/^"id":"\([^"]*\)".*/\1/p')
+[ -n "$HID" ] || fail "web: adding a habit through the form did not create it"
+ok "web adds a habit"
+
+FORM="check-in-$HID-$TODAY" submit_form "$WEB_URL/habits" "$SESSION"
+case $(api_get "/habits/habits/$HID") in *"\"check_ins\":[\"$TODAY\"]"*) ok "web checks off today" ;; *) fail "web: checking off today did not stick" ;; esac
+FORM="check-in-$HID-$TODAY" submit_form "$WEB_URL/habits" "$SESSION"
+case $(api_get "/habits/habits/$HID") in *'"check_ins":[]'*) ok "web un-checks today" ;; *) fail "web: un-checking today did not stick" ;; esac
+
+FORM="archive-habit-$HID" submit_form "$WEB_URL/habits/$HID/edit" "$SESSION"
+case $(api_get "/habits/habits/$HID") in *'"archived":true'*) ok "web archives a habit" ;; *) fail "web: archiving did not stick" ;; esac
+[ "$(curl -sS -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $SESSION" "$API_URL/habits/habits/$HID/check-ins/$TODAY")" = 409 ] \
+  || fail "api: an archived habit's check-ins must be read-only"
+ok "api keeps an archived habit read-only"
+
+FORM="restore-habit-$HID" submit_form "$WEB_URL/habits/archived" "$SESSION"
+case $(api_get "/habits/habits/$HID") in *'"archived":false'*) ok "web restores a habit" ;; *) fail "web: restoring did not stick" ;; esac
+[ "$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $SESSION" "$API_URL/habits/habits/$HID")" = 409 ] \
+  || fail "api: an active habit must be archived before it can be deleted"
+ok "api refuses to delete an active habit"
+
+FORM="archive-habit-$HID" submit_form "$WEB_URL/habits/$HID/edit" "$SESSION"
+FORM="delete-habit-$HID" submit_form "$WEB_URL/habits/archived" "$SESSION"
+grep -qi "^location: /habits/archived" "$WORK/headers" || fail "web: deleting a habit did not return to /habits/archived"
+[ "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SESSION" "$API_URL/habits/habits/$HID")" = 404 ] \
+  || fail "web: deleting the archived habit did not remove it"
+ok "web deletes an archived habit"
 
 submit_form "$WEB_URL/" "$SESSION"
 grep -qi "^location: /login" "$WORK/headers" || fail "web: signing out did not redirect to /login"

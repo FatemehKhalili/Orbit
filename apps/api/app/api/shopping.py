@@ -6,12 +6,12 @@ belongs to someone else is "not found", exactly like one that does not exist.
 
 import uuid
 from datetime import datetime
-from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Response, status
-from pydantic import AfterValidator, BaseModel, ConfigDict, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import delete, select, update
 
+from app.api.text import blank_to_none, optional_text, required_text
 from app.auth.dependencies import CurrentUserDep
 from app.database import SessionDep
 from app.models import ShoppingItem, User
@@ -19,26 +19,9 @@ from app.models.shopping import NAME_MAX_LENGTH, NOTES_MAX_LENGTH, QUANTITY_MAX_
 
 router = APIRouter(prefix="/shopping", tags=["shopping"])
 
-
-def _no_nul(value: str) -> str:
-    # PostgreSQL text cannot store NUL, so refuse it here (422) instead of failing in the
-    # database (500).
-    if "\x00" in value:
-        raise ValueError("must not contain NUL characters")
-    return value
-
-
-NoNul = AfterValidator(_no_nul)
-
-Name = Annotated[
-    str,
-    StringConstraints(strip_whitespace=True, min_length=1, max_length=NAME_MAX_LENGTH),
-    NoNul,
-]
-Quantity = Annotated[
-    str, StringConstraints(strip_whitespace=True, max_length=QUANTITY_MAX_LENGTH), NoNul
-]
-Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=NOTES_MAX_LENGTH), NoNul]
+Name = required_text(NAME_MAX_LENGTH)
+Quantity = optional_text(QUANTITY_MAX_LENGTH)
+Notes = optional_text(NOTES_MAX_LENGTH)
 
 NOT_FOUND = "Shopping item not found"
 
@@ -53,7 +36,7 @@ class _ItemInput(BaseModel):
     @field_validator("quantity", "notes")
     @classmethod
     def _blank_to_none(cls, value: str | None) -> str | None:
-        return value or None
+        return blank_to_none(value)
 
 
 class ShoppingItemCreate(_ItemInput):

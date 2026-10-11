@@ -23,26 +23,29 @@ The web app reaches the API from its server, not from the browser
 apps/
   web/                Next.js app (App Router, src/ layout)
     src/app/          Routes: login/ (sign-in form and Server Action), (app)/ (signed-in
-                      layout, dashboard, shopping/ with its Server Actions, one placeholder
-                      page per other module), api/health
+                      layout, dashboard, shopping/ and habits/ with their Server Actions,
+                      one placeholder page per other module), api/health
     src/proxy.ts      Sends requests without a session cookie to /login
-    src/components/ui shadcn/ui components (copied in, owned by us)
+    src/components/   form-message.tsx (shared); ui/: shadcn/ui components (copied in, owned by us)
     src/lib/          config.ts (env parsing), api-client.ts (calls the API), api-health.ts,
-                      auth-api.ts, auth.ts and session.ts (session cookie), shopping-api.ts
-                      and shopping.ts (Shopping calls and form logic), routes.ts
+                      auth-api.ts, auth.ts and session.ts (session cookie), forms.ts and
+                      form-actions.ts (shared form helpers), shopping-api.ts and shopping.ts,
+                      habits-api.ts and habits.ts (each module's calls and form logic), routes.ts
     Dockerfile        targets: dev, runtime (default)
   api/                FastAPI app
     app/main.py       create_app() factory
     app/config.py     Settings from environment variables (pydantic-settings)
+    app/clock.py      Today's date in the instance timezone (TodayDep)
     app/database.py   SQLAlchemy engine, session factory, get_session dependency
     app/models/       ORM models: Base (naming convention), mixins, User, AuthSession,
-                      ShoppingItem
+                      ShoppingItem, Habit, HabitCheckIn
     app/auth/         Passwords, session tokens, owner/session service, CurrentUserDep
-    app/api/          Routers, one module per area (health.py, auth.py, shopping.py)
+    app/api/          Routers, one module per area (health.py, auth.py, time.py, shopping.py,
+                      habits.py); text.py holds the shared text field types
     app/cli.py        Admin commands: create-owner, set-password
     alembic.ini       Alembic config (no database URL; env.py reads Settings)
     migrations/       Alembic environment and revisions (baseline, users and sessions,
-                      shopping items)
+                      shopping items, habits)
     tests/            pytest
     uv.lock           Locked Python dependencies
     Dockerfile        targets: dev, runtime (default)
@@ -86,7 +89,12 @@ Why this layout and why there is no JS workspace tooling yet:
   Errors use FastAPI's default shape, `{"detail": ...}`.
 - **Product modules** follow [ADR 0007](../decisions/0007-product-module-api-conventions.md):
   every query filters on the signed-in owner in SQL, another user's row is a 404, request
-  bodies refuse unknown fields, `PATCH` for partial updates, no pagination yet.
+  bodies refuse unknown fields, `PATCH` for partial updates, 409 for state rules (such as
+  an archived habit), no pagination yet.
+- **Dates.** One instance-wide timezone, `ORBIT_TIMEZONE` (default UTC, checked at
+  startup), decides which calendar day is "today". Endpoints take it from `TodayDep`;
+  calendar dates are `DATE` columns sent as `YYYY-MM-DD`; `GET /time` gives clients the
+  zone and today's date ([ADR 0008](../decisions/0008-dates-and-the-instance-timezone.md)).
 
 ## Authentication
 
@@ -105,6 +113,7 @@ Browser ──cookie──▶ web: proxy (cookie present?) ─▶ layout/page �
 | `users` | API database | At most one row, enforced by `ck_users_single_owner` + `uq_users_is_owner` |
 | `sessions` | API database | SHA-256 hash of each token, expiry; deleting the row revokes it |
 | `shopping_items` | API database | Shopping items, each with an `owner_id` (cascade on delete) |
+| `habits`, `habit_check_ins` | API database | Habits (`archived_at` null while active) and one row per habit per day done; a composite key keeps a check-in's owner equal to its habit's, and deleting a habit deletes its check-ins |
 | `POST /auth/login` | API | Email + password → token and expiry; same 401 for every failure |
 | `POST /auth/logout` | API | Revokes the calling session (204) |
 | `GET /auth/me` | API | The signed-in owner, or 401 |
@@ -117,10 +126,13 @@ Browser ──cookie──▶ web: proxy (cookie present?) ─▶ layout/page �
   configured; `card` and `badge` added).
 - `/login` is public. Everything under the `(app)` route group is signed in: the layout
   shows the module navigation and a sign-out button; the dashboard renders on each request
-  and calls the API's readiness endpoint; Shopping has its list and an edit page; the other
-  modules have placeholder pages.
+  and calls the API's readiness endpoint; Shopping has its list and an edit page; Habits has
+  its list with a seven-day check-off strip, an edit page and an archived list; the other
+  modules have placeholder pages. Dates come from the API (`GET /time`) and are formatted
+  in UTC, so the web server's own timezone never shifts them.
 - Server code calls the API through `src/lib/api-client.ts`, which adds the session token
-  and returns a typed result (`unauthenticated`, `not_found`, `invalid`, `unavailable`).
+  and returns a typed result (`unauthenticated`, `not_found`, `conflict`, `invalid`,
+  `unavailable`).
 - Forms post to Server Actions, so they work without JavaScript and get Next.js's
   same-origin check. Route handlers are GET-only. Forms use `useActionState` for errors and
   pending states; an action whose session has expired clears the cookie and redirects to
@@ -148,6 +160,7 @@ Environment variables only; see [ADR 0003](../decisions/0003-configuration-throu
 | `DATABASE_URL`      | API            | yes      | `postgresql://…`; normalized to psycopg  |
 | `ORBIT_ENV`         | API            | no       | `development` (default), `test`, `production` |
 | `ORBIT_SESSION_TTL_DAYS` | API       | no       | Sign-in lifetime in days, 1–365 (default 30) |
+| `ORBIT_TIMEZONE`    | API            | no       | IANA zone that decides "today" (default `UTC`); an unknown or empty value stops startup |
 | `ORBIT_API_URL`     | Web (server)   | yes      | API base URL as seen from the web server |
 | `ORBIT_INSECURE_COOKIES` | Web (server) | no    | `true` drops `Secure` from the session cookie in production, for plain-HTTP home networks only |
 | `POSTGRES_USER/PASSWORD/DB` | Compose | password yes | Compose builds `DATABASE_URL` from these |
@@ -164,10 +177,10 @@ starts serving. Ports bind to 127.0.0.1 only.
 | Level        | Where                         | Tooling           |
 | ------------ | ----------------------------- | ----------------- |
 | API unit     | `apps/api/tests`              | pytest, TestClient |
-| API + DB     | `apps/api/tests` (`integration` marker, needs `TEST_DATABASE_URL`): readiness, migrations up/down, `alembic check`, sign-in, sessions, the one-owner constraint (including concurrent inserts), admin CLI, Shopping CRUD and ownership with a second user (`two_users_client`, ADR 0007) | pytest |
+| API + DB     | `apps/api/tests` (`integration` marker, needs `TEST_DATABASE_URL`): readiness, migrations up/down, `alembic check`, sign-in, sessions, the one-owner constraint (including concurrent inserts), admin CLI, Shopping and Habits CRUD and ownership with a second user (`two_users_client`, ADR 0007), the check-in window across a day boundary, races with a concurrent delete | pytest |
 | Web unit     | `apps/web/src/**/*.test.ts`   | Vitest            |
 | Images       | `scripts/check-image.sh`      | Builds and starts each `runtime` image in CI |
-| End to end   | `scripts/smoke-test.sh`: health, then sign in, add, check, edit and delete a shopping item, and sign out, all through the web forms | curl, against Compose |
+| End to end   | `scripts/smoke-test.sh`: health, then sign in, add, check, edit and delete a shopping item, add a habit, check and un-check today, archive, restore and delete it, and sign out, all through the web forms | curl, against Compose |
 
 ## Open questions
 

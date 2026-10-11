@@ -15,12 +15,20 @@ npm run dev
 Open http://localhost:3000 and sign in with the owner account (create it with the API's
 `create-owner` command, see [apps/api/README.md](../api/README.md)). The dashboard shows a
 placeholder for the MVP modules and a **Backend** card that reports the API's
-`/health/ready` result. **Shopping** (`/shopping`) is the owner's shopping list; the other
-modules have placeholder pages.
+`/health/ready` result. **Shopping** (`/shopping`) is the owner's shopping list.
+**Habits** (`/habits`) lists active habits, each with a strip of the last seven days to
+check off; `/habits/[id]/edit` edits, archives or restores one, and `/habits/archived` lists
+archived habits, which can be restored or deleted for good. The other modules have
+placeholder pages.
 
 Server code calls the API through `src/lib/api-client.ts` (`apiRequest()`), which adds the
-session token and maps failures to `unauthenticated`, `not_found`, `invalid` or
-`unavailable`. Forms are Server Actions, so they work without JavaScript.
+session token and maps failures to `unauthenticated`, `not_found`, `conflict`, `invalid` or
+`unavailable`. Forms are Server Actions, so they work without JavaScript; the helpers they
+share are in `src/lib/forms.ts`, `src/lib/form-actions.ts` and
+`src/components/form-message.tsx`.
+
+"Today" always comes from the API (`GET /time`, in the instance's `ORBIT_TIMEZONE`), and
+calendar dates are formatted in UTC, so the web server's own timezone never moves a day.
 
 ## Configuration
 

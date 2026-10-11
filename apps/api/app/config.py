@@ -6,6 +6,7 @@ environment (or an untracked .env file next to where the API is started).
 
 from functools import lru_cache
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     session_ttl_days: int = Field(
         default=30, ge=1, le=365, validation_alias="ORBIT_SESSION_TTL_DAYS"
     )
+    # The instance timezone decides what "today" is (ADR 0008).
+    timezone: str = Field(default="UTC", validation_alias="ORBIT_TIMEZONE")
 
     @field_validator("database_url")
     @classmethod
@@ -33,6 +36,18 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL must be a PostgreSQL URL (postgresql://...)")
         scheme, rest = url.split("://", 1)
         return SecretStr(f"postgresql+psycopg://{rest}")
+
+    @field_validator("timezone")
+    @classmethod
+    def known_timezone(cls, value: str) -> str:
+        """Fail at startup on a zone that does not exist, rather than use the wrong day."""
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ValueError(
+                "ORBIT_TIMEZONE must be an IANA time zone name such as Europe/Berlin or UTC"
+            ) from None
+        return value
 
 
 @lru_cache

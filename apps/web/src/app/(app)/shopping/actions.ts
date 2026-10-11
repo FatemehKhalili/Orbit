@@ -1,10 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { clearSession, getSessionToken } from "@/lib/auth";
-import { LOGIN_PATH } from "@/lib/routes";
+import { getSessionToken } from "@/lib/auth";
+import { settleAction } from "@/lib/form-actions";
 import {
   performAddItem,
   performDeleteItem,
@@ -24,14 +23,8 @@ import {
 
 const SHOPPING_PATH = "/shopping";
 
-async function settle(state: ShoppingFormState): Promise<ShoppingFormState> {
-  if (state.status === "signed_out") {
-    await clearSession();
-    redirect(LOGIN_PATH);
-  }
-  // Re-render the list in the same round trip, with or without JavaScript.
-  revalidatePath(SHOPPING_PATH);
-  return state;
+function settle(state: ShoppingFormState): Promise<ShoppingFormState> {
+  return settleAction(state, SHOPPING_PATH);
 }
 
 export async function addItem(

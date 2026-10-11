@@ -6,6 +6,7 @@
  */
 
 import type { ApiError, ApiResult } from "@/lib/api-client";
+import { failedState, formText, type FormState, IDLE, SIGNED_OUT, textLength } from "@/lib/forms";
 import type {
   NewShoppingItem,
   ShoppingItem,
@@ -17,14 +18,9 @@ export const SHOPPING_LIMITS = { name: 200, quantity: 50, notes: 1000 } as const
 
 export type ItemFields = { name: string; quantity: string; notes: string };
 
-export type ShoppingFormState =
-  | { status: "idle" }
-  | { status: "success"; message?: string }
-  | { status: "error"; error: string; fields?: ItemFields }
-  /** The session is gone: the caller clears the cookie and sends the user to sign in. */
-  | { status: "signed_out" };
+export type ShoppingFormState = FormState<ItemFields>;
 
-export const IDLE: ShoppingFormState = { status: "idle" };
+export { IDLE };
 
 export const SHOPPING_ERRORS = {
   nameMissing: "Enter a name for the item.",
@@ -34,6 +30,7 @@ export const SHOPPING_ERRORS = {
   missingItem: "Orbit could not tell which item to change. Reload the page and try again.",
   invalid: "Orbit could not save this item. Check the fields and try again.",
   not_found: "This item no longer exists. It may have been deleted elsewhere.",
+  conflict: "Orbit could not save this change. Reload the page and try again.",
   unavailable: "Orbit could not reach its server. Try again in a moment.",
 } as const;
 
@@ -47,31 +44,27 @@ export type ShoppingApi = {
   remove: (token: string, id: string) => Promise<ApiResult<undefined>>;
 };
 
-function text(formData: FormData, name: string): string {
-  const value = formData.get(name);
-  return typeof value === "string" ? value.trim() : "";
-}
-
 export function readItemFields(formData: FormData): ItemFields {
   return {
-    name: text(formData, "name"),
-    quantity: text(formData, "quantity"),
-    notes: text(formData, "notes"),
+    name: formText(formData, "name"),
+    quantity: formText(formData, "quantity"),
+    notes: formText(formData, "notes"),
   };
 }
 
 /** Checks the fields; returns the item to send, or the message to show. */
 export function validateItem(fields: ItemFields): NewShoppingItem | string {
   if (!fields.name) return SHOPPING_ERRORS.nameMissing;
-  if (fields.name.length > SHOPPING_LIMITS.name) return SHOPPING_ERRORS.nameTooLong;
-  if (fields.quantity.length > SHOPPING_LIMITS.quantity) return SHOPPING_ERRORS.quantityTooLong;
-  if (fields.notes.length > SHOPPING_LIMITS.notes) return SHOPPING_ERRORS.notesTooLong;
+  if (textLength(fields.name) > SHOPPING_LIMITS.name) return SHOPPING_ERRORS.nameTooLong;
+  if (textLength(fields.quantity) > SHOPPING_LIMITS.quantity) {
+    return SHOPPING_ERRORS.quantityTooLong;
+  }
+  if (textLength(fields.notes) > SHOPPING_LIMITS.notes) return SHOPPING_ERRORS.notesTooLong;
   return { name: fields.name, quantity: fields.quantity || null, notes: fields.notes || null };
 }
 
 function failed(error: ApiError, fields?: ItemFields): ShoppingFormState {
-  if (error === "unauthenticated") return { status: "signed_out" };
-  return { status: "error", error: SHOPPING_ERRORS[error], fields };
+  return failedState(error, SHOPPING_ERRORS, fields);
 }
 
 export async function performAddItem(
@@ -79,7 +72,7 @@ export async function performAddItem(
   token: string | undefined,
   api: Pick<ShoppingApi, "create">,
 ): Promise<ShoppingFormState> {
-  if (!token) return { status: "signed_out" };
+  if (!token) return SIGNED_OUT;
   const fields = readItemFields(formData);
   const item = validateItem(fields);
   if (typeof item === "string") return { status: "error", error: item, fields };
@@ -94,8 +87,8 @@ export async function performEditItem(
   token: string | undefined,
   api: Pick<ShoppingApi, "update">,
 ): Promise<ShoppingFormState> {
-  if (!token) return { status: "signed_out" };
-  const id = text(formData, "id");
+  if (!token) return SIGNED_OUT;
+  const id = formText(formData, "id");
   if (!id) return { status: "error", error: SHOPPING_ERRORS.missingItem };
   const fields = readItemFields(formData);
   const item = validateItem(fields);
@@ -112,11 +105,11 @@ export async function performToggleItem(
   token: string | undefined,
   api: Pick<ShoppingApi, "update">,
 ): Promise<ShoppingFormState> {
-  if (!token) return { status: "signed_out" };
-  const id = text(formData, "id");
+  if (!token) return SIGNED_OUT;
+  const id = formText(formData, "id");
   if (!id) return { status: "error", error: SHOPPING_ERRORS.missingItem };
   // The form carries the state to switch to, so a repeated submit cannot flip it back.
-  const checked = text(formData, "checked") === "true";
+  const checked = formText(formData, "checked") === "true";
 
   const result = await api.update(token, id, { checked });
   if (!result.ok) return failed(result.error);
@@ -128,8 +121,8 @@ export async function performDeleteItem(
   token: string | undefined,
   api: Pick<ShoppingApi, "remove">,
 ): Promise<ShoppingFormState> {
-  if (!token) return { status: "signed_out" };
-  const id = text(formData, "id");
+  if (!token) return SIGNED_OUT;
+  const id = formText(formData, "id");
   if (!id) return { status: "error", error: SHOPPING_ERRORS.missingItem };
 
   const result = await api.remove(token, id);

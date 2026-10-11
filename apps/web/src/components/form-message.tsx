@@ -1,7 +1,7 @@
-import type { ShoppingFormState } from "@/lib/shopping";
+import type { FormState } from "@/lib/forms";
 
-/** The outcome of a Shopping form: an error, or a short confirmation. */
-export function FormMessage({ state }: { state: ShoppingFormState }) {
+/** The outcome of a form: an error, or a short confirmation. */
+export function FormMessage({ state }: { state: FormState<unknown> }) {
   if (state.status === "error") {
     return (
       <p role="alert" className="text-destructive text-sm">

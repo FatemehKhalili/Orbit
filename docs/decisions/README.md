@@ -13,3 +13,4 @@ marked as superseded with a link to the replacement.
 | [0005](0005-python-dependency-locking-and-updates.md) | Python dependency locking with uv, updates with Dependabot | Accepted |
 | [0006](0006-owner-account-and-sessions.md) | One owner account with server-side sessions | Accepted |
 | [0007](0007-product-module-api-conventions.md) | Product module API conventions and ownership | Accepted |
+| [0008](0008-dates-and-the-instance-timezone.md) | Dates and the instance timezone | Accepted |
