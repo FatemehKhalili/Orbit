@@ -60,9 +60,14 @@ def test_migrations_upgrade_downgrade_and_match_the_models(database_url_from_env
     try:
         command.upgrade(config, "head")
         inspector = inspect(engine)
-        assert {"alembic_version", "users", "sessions", "shopping_items"} <= set(
-            inspector.get_table_names()
-        )
+        assert {
+            "alembic_version",
+            "users",
+            "sessions",
+            "shopping_items",
+            "habits",
+            "habit_check_ins",
+        } <= set(inspector.get_table_names())
         assert {c["name"] for c in inspector.get_unique_constraints("users")} == {
             "uq_users_email",
             "uq_users_is_owner",
@@ -79,6 +84,21 @@ def test_migrations_upgrade_downgrade_and_match_the_models(database_url_from_env
         assert [ix["name"] for ix in inspector.get_indexes("shopping_items")] == [
             "ix_shopping_items_owner_id"
         ]
+        assert {c["name"] for c in inspector.get_unique_constraints("habits")} == {
+            "uq_habits_id_owner_id"
+        }
+        check_in_fks = {fk["name"]: fk for fk in inspector.get_foreign_keys("habit_check_ins")}
+        assert set(check_in_fks) == {
+            "fk_habit_check_ins_habit_id_owner_id_habits",
+            "fk_habit_check_ins_owner_id_users",
+        }
+        habit_fk = check_in_fks["fk_habit_check_ins_habit_id_owner_id_habits"]
+        assert habit_fk["constrained_columns"] == ["habit_id", "owner_id"]
+        assert habit_fk["referred_columns"] == ["id", "owner_id"]
+        assert habit_fk["options"]["ondelete"] == "CASCADE"
+        assert {c["name"] for c in inspector.get_unique_constraints("habit_check_ins")} == {
+            "uq_habit_check_ins_habit_id_day"
+        }
 
         # Models and migrations agree: autogenerate would produce no changes.
         command.check(config)

@@ -70,3 +70,21 @@ def test_session_lifetime_defaults_to_30_days():
 def test_session_lifetime_must_be_between_1_and_365_days(days):
     with pytest.raises(ValidationError):
         make_settings(DATABASE_URL="postgresql://u:p@db/orbit", ORBIT_SESSION_TTL_DAYS=days)
+
+
+def test_timezone_defaults_to_utc(monkeypatch):
+    monkeypatch.delenv("ORBIT_TIMEZONE", raising=False)
+
+    assert make_settings(DATABASE_URL="postgresql://u:p@db/orbit").timezone == "UTC"
+
+
+def test_timezone_is_read_from_the_environment(monkeypatch):
+    monkeypatch.setenv("ORBIT_TIMEZONE", "Europe/Berlin")
+
+    assert make_settings(DATABASE_URL="postgresql://u:p@db/orbit").timezone == "Europe/Berlin"
+
+
+@pytest.mark.parametrize("zone", ["Mars/Olympus_Mons", "", "Europe/../etc/passwd", "+02:00"])
+def test_an_unknown_timezone_stops_the_api_from_starting(zone):
+    with pytest.raises(ValidationError, match="ORBIT_TIMEZONE must be an IANA time zone"):
+        make_settings(DATABASE_URL="postgresql://u:p@db/orbit", ORBIT_TIMEZONE=zone)

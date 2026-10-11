@@ -48,7 +48,9 @@ def db_settings(monkeypatch) -> Iterator[Settings]:
     test_settings = Settings(ORBIT_ENV="test", DATABASE_URL=url, _env_file=None)
     engine = create_database_engine(test_settings)
     with engine.begin() as connection:
-        connection.execute(text("TRUNCATE users, sessions, shopping_items CASCADE"))
+        connection.execute(
+            text("TRUNCATE users, sessions, shopping_items, habits, habit_check_ins CASCADE")
+        )
     engine.dispose()
 
     yield test_settings
