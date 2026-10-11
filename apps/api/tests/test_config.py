@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -88,3 +90,13 @@ def test_timezone_is_read_from_the_environment(monkeypatch):
 def test_an_unknown_timezone_stops_the_api_from_starting(zone):
     with pytest.raises(ValidationError, match="ORBIT_TIMEZONE must be an IANA time zone"):
         make_settings(DATABASE_URL="postgresql://u:p@db/orbit", ORBIT_TIMEZONE=zone)
+
+
+def test_compose_passes_an_empty_timezone_through_so_the_api_refuses_it():
+    # `${VAR-default}` uses the default only when VAR is unset; `${VAR:-default}` would also
+    # turn an empty value into UTC and hide the mistake (ADR 0008).
+    compose = Path(__file__).resolve().parents[3] / "docker-compose.yml"
+    if not compose.exists():
+        pytest.skip("docker-compose.yml is not part of this checkout")
+
+    assert "ORBIT_TIMEZONE: ${ORBIT_TIMEZONE-UTC}" in compose.read_text()

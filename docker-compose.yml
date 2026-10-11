@@ -27,7 +27,7 @@ services:
     environment:
       ORBIT_ENV: ${ORBIT_ENV:-development}
       # The instance timezone decides which calendar day is "today" (ADR 0008).
-      ORBIT_TIMEZONE: ${ORBIT_TIMEZONE:-UTC}
+      ORBIT_TIMEZONE: ${ORBIT_TIMEZONE-UTC}
       DATABASE_URL: postgresql://${POSTGRES_USER:-orbit}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-orbit}
     # Apply migrations, then serve. Production runs `alembic upgrade head` as its own
     # one-off step instead (docs/decisions/0004-database-migrations-with-alembic.md).
