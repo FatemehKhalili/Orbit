@@ -27,6 +27,7 @@ The API listens on http://localhost:8000. Interactive docs are at `/docs`.
 | `DATABASE_URL` | yes      | none          | `postgresql://user:pass@host:5432/db`           |
 | `ORBIT_ENV`    | no       | `development` | One of `development`, `test`, `production`      |
 | `ORBIT_SESSION_TTL_DAYS` | no | `30`       | How long a sign-in lasts, 1–365 days            |
+| `ORBIT_TIMEZONE` | no     | `UTC`         | IANA zone that decides "today"; unknown or empty stops startup |
 
 ## Health endpoints
 
@@ -71,6 +72,34 @@ See [ADR 0006](../../docs/decisions/0006-owner-account-and-sessions.md).
 All need a session. Every query filters on the signed-in owner; another user's item is a
 404, and request bodies refuse unknown fields such as `owner_id`. Later modules follow the
 same rules: [ADR 0007](../../docs/decisions/0007-product-module-api-conventions.md).
+
+## Dates and the instance timezone
+
+One timezone per instance, `ORBIT_TIMEZONE`, decides which calendar day is "today" for
+every module ([ADR 0008](../../docs/decisions/0008-dates-and-the-instance-timezone.md)).
+Endpoints that need it take `today: TodayDep` (from `app.clock`) instead of calling
+`date.today()`, so tests can pin it. Calendar dates are sent as `YYYY-MM-DD`.
+
+| Endpoint    | Meaning                                                         |
+| ----------- | --------------------------------------------------------------- |
+| `GET /time` | `{"timezone", "today"}`, so clients never work out "today" themselves |
+
+## Habits
+
+| Endpoint                                     | Meaning                                                   |
+| -------------------------------------------- | --------------------------------------------------------- |
+| `GET /habits/habits`                         | Active habits, oldest first; `?archived=true` for archived ones, most recently archived first |
+| `POST /habits/habits`                        | `{"name", "notes"?}` → the habit, 201                     |
+| `GET /habits/habits/{id}`                    | One habit, or 404                                         |
+| `PATCH /habits/habits/{id}`                  | Any of `name`, `notes`, `archived`; `null` clears notes   |
+| `DELETE /habits/habits/{id}`                 | Deletes an archived habit and its check-ins, 204; 409 if it is still active |
+| `PUT /habits/habits/{id}/check-ins/{day}`    | Marks the habit done on that day, 204 (repeating is fine) |
+| `DELETE /habits/habits/{id}/check-ins/{day}` | Marks it not done, 204 (already not done is fine)         |
+
+Each habit comes with `check_ins`: the days in the current window when it was done. Only
+today and the six days before can be changed (422 otherwise). An archived habit is
+read-only: changing its name, notes or check-ins is a 409 until it is unarchived. Its
+history is kept. Ownership works as in Shopping.
 
 ## Database migrations
 
