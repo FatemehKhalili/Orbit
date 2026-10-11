@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 
 import { FormMessage } from "@/components/form-message";
+import { CheckIcon, PencilIcon, TrashIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { IDLE } from "@/lib/shopping";
@@ -21,7 +22,11 @@ export function ItemRow({ item }: { item: ShoppingItem }) {
   const failure = [toggleState, deleteState].find((state) => state.status === "error");
 
   return (
-    <li className="flex flex-col gap-1 py-3" data-testid="shopping-item" data-checked={checked}>
+    <li
+      className="hover:bg-sunken/70 flex flex-col gap-1 rounded-2xl px-3 py-3 transition-colors"
+      data-testid="shopping-item"
+      data-checked={checked}
+    >
       <div className="flex items-start gap-3">
         <form action={toggle} data-testid={`toggle-item-${item.id}`}>
           <input type="hidden" name="id" value={item.id} />
@@ -31,17 +36,22 @@ export function ItemRow({ item }: { item: ShoppingItem }) {
             disabled={toggling || deleting}
             aria-label={`Mark “${item.name}” as ${item.checked ? "not bought" : "bought"}`}
             className={cn(
-              "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border text-xs transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-              checked ? "bg-primary text-primary-foreground border-primary" : "hover:bg-secondary",
+              "flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 outline-none focus-visible:ring-4 focus-visible:ring-ring/35 active:scale-90",
+              checked
+                ? "bg-mint border-mint text-white dark:text-background"
+                : "border-border-strong bg-card hover:border-mint hover:bg-mint-soft",
             )}
           >
-            {checked ? "✓" : ""}
+            {checked && <CheckIcon className="motion-safe:animate-pop size-3.5" />}
           </button>
         </form>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={cn("break-words", checked && "text-muted-foreground line-through")}
+              className={cn(
+                "font-medium break-words transition-colors",
+                checked && "text-muted-foreground decoration-blush line-through decoration-2",
+              )}
               data-testid="shopping-item-name"
             >
               {item.name}
@@ -54,25 +64,26 @@ export function ItemRow({ item }: { item: ShoppingItem }) {
             </p>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="-my-1 flex shrink-0 items-center gap-0.5">
           <Link
             href={`/shopping/${item.id}/edit`}
             className={buttonVariants({ variant: "ghost", size: "sm" })}
             aria-label={`Edit “${item.name}”`}
           >
-            Edit
+            <PencilIcon />
+            <span className="hidden sm:inline">Edit</span>
           </Link>
           <form action={remove} data-testid={`delete-item-${item.id}`}>
             <input type="hidden" name="id" value={item.id} />
             <Button
               type="submit"
-              variant="ghost"
+              variant="destructive"
               size="sm"
               disabled={deleting}
               aria-label={`Delete “${item.name}”`}
-              className="text-destructive"
             >
-              {deleting ? "Deleting…" : "Delete"}
+              <TrashIcon />
+              <span className="hidden sm:inline">{deleting ? "Deleting…" : "Delete"}</span>
             </Button>
           </form>
         </div>

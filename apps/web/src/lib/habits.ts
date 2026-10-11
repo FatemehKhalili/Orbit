@@ -219,3 +219,16 @@ export function summarize(habits: Pick<Habit, "checkIns">[], today: Day): string
   const doneToday = habits.filter((habit) => habit.checkIns.includes(today)).length;
   return `${doneToday} of ${habits.length} done today`;
 }
+
+export type DayActivity = Omit<WeekDay, "done"> & {
+  /** How many active habits were done that day. */
+  done: number;
+};
+
+/** For each of the last seven days, how many of the given habits were done. */
+export function weekActivity(habits: Pick<Habit, "checkIns">[], today: Day): DayActivity[] {
+  return buildWeek(today, []).map((day) => ({
+    ...day,
+    done: habits.filter((habit) => habit.checkIns.includes(day.day)).length,
+  }));
+}

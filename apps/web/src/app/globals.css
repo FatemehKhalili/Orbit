@@ -2,67 +2,254 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* shadcn/ui neutral theme tokens */
+/*
+ * Orbit design tokens.
+ *
+ * A small pastel family on warm cream: lavender is the brand colour, plum carries text
+ * and strong actions, and blush, mint and peach are accents that each mean one thing
+ * (blush: attention and removal, mint: done and healthy, peach: today and "soon").
+ * Components use the semantic names below, never raw hex values, so a new component
+ * (a dialog, a chart, a toast) inherits the look by using the same tokens.
+ *
+ * Text pairs are chosen for WCAG AA contrast: foreground and muted-foreground on
+ * background and card, every *-ink on its *-soft surface, primary-foreground on primary.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Surfaces */
+  --background: #fbf7f2; /* warm cream */
+  --background-glow: #f6effa; /* lilac wash behind the page */
+  --card: #fffdfb; /* milky white */
+  --card-foreground: #3b2c48;
+  --sunken: #f5eee8; /* wells: inputs at rest, list hovers */
+  --overlay: rgb(59 44 72 / 0.32); /* behind dialogs */
+
+  /* Text */
+  --foreground: #3b2c48; /* plum ink, never pure black */
+  --muted-foreground: #74647f;
+
+  /* Brand */
+  --primary: #6c4b93; /* plum */
+  --primary-hover: #5c3e80;
+  --primary-foreground: #fffdfb;
+  --secondary: #efe8fa; /* lavender mist */
+  --secondary-foreground: #4f3672;
+  --muted: #f3ede6;
+  --accent: #f4eefc;
+  --accent-foreground: #4f3672;
+
+  /* Pastel family: a soft surface, a mid tone for fills and an ink for text on the soft */
+  --lavender: #b9a3e6;
+  --lavender-soft: #efe8fa;
+  --lavender-ink: #573c80;
+  --blush: #eca3b8;
+  --blush-soft: #fce9ee;
+  --blush-ink: #96385a;
+  --mint: #93d1b2;
+  --mint-soft: #e2f4ea;
+  --mint-ink: #2b6a4d;
+  --peach: #f6b98f;
+  --peach-soft: #ffeedf;
+  --peach-ink: #8f4c20;
+
+  /* Lines and states */
+  --border: #ebe1ec;
+  --border-strong: #dccfe3;
+  --input: #e4d8ea;
+  --ring: #a58bd9;
+  --destructive: #a83a5f;
+  --destructive-soft: #fce9ee;
+
+  /* Navigation */
+  --sidebar: #f6f0f8;
+  --sidebar-foreground: #4a3859;
+  --sidebar-active: #fffdfb;
+
+  /* Shape and depth */
+  --radius: 1rem;
+  --shadow-color: 270deg 25% 40%;
+  --shadow-soft: 0 1px 2px hsl(var(--shadow-color) / 0.06), 0 2px 8px hsl(var(--shadow-color) / 0.05);
+  --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.05), 0 8px 24px -8px hsl(var(--shadow-color) / 0.12);
+  --shadow-lift: 0 2px 4px hsl(var(--shadow-color) / 0.06), 0 16px 32px -12px hsl(var(--shadow-color) / 0.22);
+  --shadow-button: 0 1px 1px hsl(var(--shadow-color) / 0.12), 0 4px 12px -4px hsl(270deg 40% 35% / 0.45);
+
+  color-scheme: light;
 }
 
+/* A cosy night version: deep plum instead of grey, the same pastels turned down. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --ring: oklch(0.556 0 0);
+    --background: #1d1724;
+    --background-glow: #261c31;
+    --card: #271f30;
+    --card-foreground: #f1e9f5;
+    --sunken: #211a29;
+    --overlay: rgb(10 6 14 / 0.6);
+
+    --foreground: #f1e9f5;
+    --muted-foreground: #b9aac6;
+
+    --primary: #c9b5f0;
+    --primary-hover: #d8c9f5;
+    --primary-foreground: #26193a;
+    --secondary: #352a44;
+    --secondary-foreground: #e6dcf8;
+    --muted: #2c2436;
+    --accent: #322840;
+    --accent-foreground: #e6dcf8;
+
+    --lavender: #9f87d6;
+    --lavender-soft: #352a48;
+    --lavender-ink: #dccdf8;
+    --blush: #d98aa2;
+    --blush-soft: #45263a;
+    --blush-ink: #f7c4d3;
+    --mint: #7cbf9f;
+    --mint-soft: #1f3a30;
+    --mint-ink: #b8ead0;
+    --peach: #e7a679;
+    --peach-soft: #43301f;
+    --peach-ink: #fbd4b6;
+
+    --border: #392e45;
+    --border-strong: #4a3d58;
+    --input: #46395a;
+    --ring: #a58bd9;
+    --destructive: #f19ab4;
+    --destructive-soft: #45263a;
+
+    --sidebar: #211a29;
+    --sidebar-foreground: #e4d9ee;
+    --sidebar-active: #30263c;
+
+    --shadow-color: 270deg 40% 4%;
+    --shadow-button: 0 1px 1px hsl(var(--shadow-color) / 0.3), 0 4px 14px -4px hsl(270deg 60% 70% / 0.25);
+
+    color-scheme: dark;
   }
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --font-sans:
+    ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Vazirmatn", system-ui, -apple-system,
+    "Segoe UI", Tahoma, sans-serif;
+  --font-display:
+    ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Vazirmatn", system-ui, -apple-system,
+    "Segoe UI", Tahoma, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 0.5rem);
+  --radius-md: calc(var(--radius) - 0.25rem);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 0.25rem);
+  --radius-2xl: calc(var(--radius) + 0.5rem);
+  --radius-3xl: calc(var(--radius) + 0.875rem);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-card: var(--shadow-card);
+  --shadow-lift: var(--shadow-lift);
+  --shadow-button: var(--shadow-button);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-sunken: var(--sunken);
+  --color-overlay: var(--overlay);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-destructive: var(--destructive);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-lavender: var(--lavender);
+  --color-lavender-soft: var(--lavender-soft);
+  --color-lavender-ink: var(--lavender-ink);
+  --color-blush: var(--blush);
+  --color-blush-soft: var(--blush-soft);
+  --color-blush-ink: var(--blush-ink);
+  --color-mint: var(--mint);
+  --color-mint-soft: var(--mint-soft);
+  --color-mint-ink: var(--mint-ink);
+  --color-peach: var(--peach);
+  --color-peach-soft: var(--peach-soft);
+  --color-peach-ink: var(--peach-ink);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active: var(--sidebar-active);
+
+  --animate-orbit: orbit 24s linear infinite;
+  --animate-pop: pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes orbit {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes pop {
+    0% {
+      transform: scale(0.6);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/60;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(60rem 30rem at 100% -10%, var(--background-glow), transparent 70%),
+      radial-gradient(40rem 24rem at -10% 110%, var(--background-glow), transparent 70%);
+    background-attachment: fixed;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display text-balance;
+  }
+  ::selection {
+    background: var(--lavender-soft);
+    color: var(--lavender-ink);
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  /* Persian text reads better a touch larger and without letter spacing. */
+  :lang(fa) {
+    letter-spacing: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

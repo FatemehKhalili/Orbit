@@ -14,6 +14,7 @@ import {
   readHabitFields,
   summarize,
   validateHabit,
+  weekActivity,
 } from "./habits";
 import type { Habit } from "./habits-api";
 
@@ -346,5 +347,27 @@ describe("dates and the seven-day strip", () => {
         "2026-10-11",
       ),
     ).toBe("1 of 3 done today");
+  });
+});
+
+describe("weekActivity", () => {
+  it("counts the habits done on each of the last seven days, ending today", () => {
+    const habits = [
+      { checkIns: ["2026-10-05", "2026-10-11"] },
+      { checkIns: ["2026-10-11"] },
+      { checkIns: [] },
+    ];
+    const week = weekActivity(habits, "2026-10-11");
+
+    expect(week.map((day) => [day.day, day.done])).toEqual([
+      ["2026-10-05", 1],
+      ["2026-10-06", 0],
+      ["2026-10-07", 0],
+      ["2026-10-08", 0],
+      ["2026-10-09", 0],
+      ["2026-10-10", 0],
+      ["2026-10-11", 2],
+    ]);
+    expect(week.at(-1)).toMatchObject({ weekday: "Sun", isToday: true });
   });
 });
