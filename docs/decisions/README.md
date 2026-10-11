@@ -14,3 +14,5 @@ marked as superseded with a link to the replacement.
 | [0006](0006-owner-account-and-sessions.md) | One owner account with server-side sessions | Accepted |
 | [0007](0007-product-module-api-conventions.md) | Product module API conventions and ownership | Accepted |
 | [0008](0008-dates-and-the-instance-timezone.md) | Dates and the instance timezone | Accepted |
+| [0009](0009-production-deployment-backups-and-upgrades.md) | Production deployment, backups, export and upgrades | Accepted |
+| [0010](0010-sign-in-throttling-and-known-devices.md) | Sign-in throttling and known devices | Accepted |
