@@ -2,8 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { ArrowBackIcon, SproutIcon } from "@/components/icons";
+import { PageHeader } from "@/components/page-header";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { UnavailableCard } from "@/components/unavailable-card";
 import { getSessionToken, requireUser } from "@/lib/auth";
 import { getHabit } from "@/lib/habits-api";
 import { LOGIN_PATH } from "@/lib/routes";
@@ -22,13 +26,16 @@ export default async function EditHabitPage({ params }: PageProps<"/habits/[id]/
   if (result && !result.ok && result.error === "unauthenticated") redirect(LOGIN_PATH);
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-10">
-      <h1 className="text-3xl font-semibold tracking-tight">Habits</h1>
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8 lg:py-10">
+      <PageHeader title="Habits" icon={SproutIcon} tone="mint" />
       {result?.ok ? (
         result.data.archived ? (
           // Archived habits are read-only (ADR 0007 addendum): restore or delete only.
           <Card data-testid="archived-habit">
             <CardHeader>
+              <Badge variant="secondary" className="justify-self-start">
+                Archived
+              </Badge>
               <CardTitle className="break-words">{result.data.name}</CardTitle>
               <CardDescription>
                 This habit is archived, so it and its history cannot be changed. Restore it to
@@ -53,7 +60,7 @@ export default async function EditHabitPage({ params }: PageProps<"/habits/[id]/
             </CardHeader>
             <CardContent className="flex flex-col gap-6">
               <EditHabitForm habit={result.data} />
-              <div className="flex flex-col gap-2 border-t pt-4">
+              <div className="bg-sunken/60 flex flex-col items-start gap-3 rounded-2xl p-4">
                 <p className="text-muted-foreground text-sm">
                   Archive a habit you no longer track. It keeps its history and can be restored.
                   Only archived habits can be deleted.
@@ -64,25 +71,24 @@ export default async function EditHabitPage({ params }: PageProps<"/habits/[id]/
           </Card>
         )
       ) : (
-        <Card className="max-w-lg" data-testid="habit-missing">
-          <CardHeader>
-            <CardTitle>
-              {result?.ok === false && result.error !== "unavailable"
-                ? "This habit does not exist"
-                : "This habit could not be loaded"}
-            </CardTitle>
-            <CardDescription>
-              {result?.ok === false && result.error !== "unavailable"
-                ? "It may have been deleted."
-                : "Orbit could not reach its server. Try again in a moment."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/habits" className={buttonVariants({ variant: "outline" })}>
-              Back to habits
-            </Link>
-          </CardContent>
-        </Card>
+        <UnavailableCard
+          data-testid="habit-missing"
+          title={
+            result?.ok === false && result.error !== "unavailable"
+              ? "This habit does not exist"
+              : "This habit could not be loaded"
+          }
+          description={
+            result?.ok === false && result.error !== "unavailable"
+              ? "It may have been deleted."
+              : "Orbit could not reach its server. Try again in a moment."
+          }
+        >
+          <Link href="/habits" className={buttonVariants({ variant: "outline" })}>
+            <ArrowBackIcon />
+            Back to habits
+          </Link>
+        </UnavailableCard>
       )}
     </main>
   );

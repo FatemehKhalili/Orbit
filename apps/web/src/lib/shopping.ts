@@ -131,6 +131,11 @@ export async function performDeleteItem(
   return { status: "success" };
 }
 
+/** How many items are still to buy (not checked off). */
+export function countToBuy(items: Pick<ShoppingItem, "checked">[]): number {
+  return items.filter((item) => !item.checked).length;
+}
+
 /** "3 to buy · 2 checked", for the list heading. */
 export function summarize(items: Pick<ShoppingItem, "checked">[]): string {
   if (items.length === 0) return "Nothing on the list";

@@ -2,10 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { EmptyState } from "@/components/empty-state";
+import { ArchiveIcon, SproutIcon } from "@/components/icons";
+import { SeedlingIllustration } from "@/components/illustrations";
+import { PageHeader } from "@/components/page-header";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { UnavailableCard } from "@/components/unavailable-card";
 import { getSessionToken, requireUser } from "@/lib/auth";
-import { formatLongDate, summarize } from "@/lib/habits";
+import { allDoneToday, formatLongDate, summarize } from "@/lib/habits";
 import { getTime, listHabits } from "@/lib/habits-api";
 import { LOGIN_PATH } from "@/lib/routes";
 
@@ -32,13 +38,14 @@ export default async function HabitsPage() {
   const [time, habits, archived] = results ?? [];
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-10">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Habits</h1>
-        <p className="text-muted-foreground mt-1" data-testid="habits-today">
-          {time?.ok ? formatLongDate(time.data.today) : "Build and track routines."}
-        </p>
-      </header>
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8 lg:py-10">
+      <PageHeader
+        title="Habits"
+        description={time?.ok ? formatLongDate(time.data.today) : "Build and track routines."}
+        descriptionTestId="habits-today"
+        icon={SproutIcon}
+        tone="mint"
+      />
 
       {time?.ok && habits?.ok ? (
         <>
@@ -52,20 +59,28 @@ export default async function HabitsPage() {
           </Card>
 
           <Card data-testid="habit-list">
-            <CardHeader>
+            <CardHeader className="grid-cols-[1fr_auto] items-center">
               <CardTitle>Your habits</CardTitle>
-              <CardDescription>
-                {summarize(habits.data, time.data.today)}. Check off today or any of the six days
-                before.
+              <Badge variant={allDoneToday(habits.data, time.data.today) ? "success" : "default"}>
+                {summarize(habits.data, time.data.today)}
+              </Badge>
+              <CardDescription className="col-span-2">
+                Check off today or any of the six days before.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 sm:px-4">
               {habits.data.length === 0 ? (
-                <p className="text-muted-foreground text-sm" data-testid="habits-empty">
-                  No habits yet. Add the first one above.
-                </p>
+                <EmptyState
+                  tone="mint"
+                  illustration={<SeedlingIllustration />}
+                  title="Nothing planted yet"
+                  className="mx-3 sm:mx-2"
+                  data-testid="habits-empty"
+                >
+                  No habits yet. Add the first one above and watch your week grow.
+                </EmptyState>
               ) : (
-                <ul className="divide-y">
+                <ul className="flex flex-col gap-1">
                   {habits.data.map((habit) => (
                     <HabitRow key={habit.id} habit={habit} today={time.data.today} />
                   ))}
@@ -79,18 +94,16 @@ export default async function HabitsPage() {
             className={buttonVariants({ variant: "outline", className: "self-start" })}
             data-testid="archived-habits-link"
           >
+            <ArchiveIcon />
             Archived habits{archived?.ok ? ` (${archived.data.length})` : ""}
           </Link>
         </>
       ) : (
-        <Card className="max-w-lg" data-testid="habits-unavailable">
-          <CardHeader>
-            <CardTitle>Your habits could not be loaded</CardTitle>
-            <CardDescription>
-              Orbit could not reach its server. Try again in a moment.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <UnavailableCard
+          data-testid="habits-unavailable"
+          title="Your habits could not be loaded"
+          description="Orbit could not reach its server. Try again in a moment."
+        />
       )}
     </main>
   );
