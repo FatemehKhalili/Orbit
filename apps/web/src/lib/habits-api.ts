@@ -1,9 +1,7 @@
-/** Calls to the API's /habits and /time endpoints. Server-side only (ADR 0002). */
+/** Calls to the API's /habits endpoints. Server-side only (ADR 0002). */
 
 import { apiRequest, type ApiOptions, type ApiResult } from "@/lib/api-client";
-
-/** A calendar date as the API sends it, "2026-10-11" (ADR 0008). */
-export type Day = string;
+import type { Day } from "@/lib/time-api";
 
 export type Habit = {
   id: string;
@@ -20,9 +18,6 @@ export type Habit = {
 export type NewHabit = { name: string; notes: string | null };
 
 export type HabitChanges = Partial<NewHabit & { archived: boolean }>;
-
-/** The instance timezone and the date that counts as today in it. */
-export type OrbitTime = { timezone: string; today: Day };
 
 type ApiHabit = Omit<Habit, "archivedAt" | "checkIns" | "createdAt" | "updatedAt"> & {
   archived_at: string | null;
@@ -53,13 +48,6 @@ function fromApi({ archived_at, check_ins, created_at, updated_at, ...habit }: A
 
 function mapHabit<T, U>(result: ApiResult<T>, map: (data: T) => U): ApiResult<U> {
   return result.ok ? { ok: true, data: map(result.data) } : result;
-}
-
-export async function getTime(
-  token: string,
-  options: ApiOptions = {},
-): Promise<ApiResult<OrbitTime>> {
-  return apiRequest<OrbitTime>("/time", { token }, options);
 }
 
 /**

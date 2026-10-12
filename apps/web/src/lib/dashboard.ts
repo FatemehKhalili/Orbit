@@ -5,9 +5,10 @@
  */
 
 import { countDoneToday } from "@/lib/habits";
-import type { Day, Habit } from "@/lib/habits-api";
+import type { Habit } from "@/lib/habits-api";
 import { countToBuy } from "@/lib/shopping";
 import type { ShoppingItem } from "@/lib/shopping-api";
+import type { Day } from "@/lib/time-api";
 
 /** How many unchecked items the "To buy" card lists before linking to the Shopping page. */
 export const TO_BUY_LIMIT = 5;

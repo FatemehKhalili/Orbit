@@ -18,10 +18,12 @@ import {
   type TodayHabits,
   type ToBuyPreview,
 } from "@/lib/dashboard";
-import { allDoneToday, formatLongDate, weekActivity, type DayActivity } from "@/lib/habits";
-import { getTime, listHabits, type Day } from "@/lib/habits-api";
+import { formatLongDate } from "@/lib/days";
+import { allDoneToday, weekActivity, type DayActivity } from "@/lib/habits";
+import { listHabits } from "@/lib/habits-api";
 import { LOGIN_PATH, MODULES } from "@/lib/routes";
 import { listShoppingItems } from "@/lib/shopping-api";
+import { getTime, type Day } from "@/lib/time-api";
 import { cn } from "@/lib/utils";
 
 import { TodayHabitRow, ToBuyRow } from "./dashboard-rows";

@@ -7,7 +7,8 @@ import { FormMessage } from "@/components/form-message";
 import { CheckIcon, PencilIcon } from "@/components/icons";
 import { buttonVariants } from "@/components/ui/button";
 import { buildWeek, IDLE, type WeekDay } from "@/lib/habits";
-import type { Day, Habit } from "@/lib/habits-api";
+import type { Habit } from "@/lib/habits-api";
+import type { Day } from "@/lib/time-api";
 import { cn } from "@/lib/utils";
 
 import { checkIn } from "./actions";

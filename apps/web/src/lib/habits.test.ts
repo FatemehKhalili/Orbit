@@ -2,11 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiError } from "./api-client";
 import {
-  addDays,
   allDoneToday,
   buildWeek,
   countDoneToday,
-  formatLongDate,
   HABIT_ERRORS,
   performAddHabit,
   performArchiveHabit,
@@ -18,6 +16,7 @@ import {
   validateHabit,
   weekActivity,
 } from "./habits";
+import { formatLongDate } from "./days";
 import type { Habit } from "./habits-api";
 
 function form(fields: Record<string, string>): FormData {
@@ -294,12 +293,6 @@ describe("performCheckIn", () => {
 describe("dates and the seven-day strip", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
-  });
-
-  it("adds days across month and year ends", () => {
-    expect(addDays("2026-10-01", -1)).toBe("2026-09-30");
-    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
-    expect(addDays("2028-03-01", -1)).toBe("2028-02-29");
   });
 
   it("builds the seven days ending today, oldest first", () => {
