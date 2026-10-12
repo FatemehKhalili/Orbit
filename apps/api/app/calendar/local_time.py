@@ -49,7 +49,7 @@ def local_day(instant: datetime, zone: ZoneInfo) -> date:
 
 
 def local_time(instant: datetime, zone: ZoneInfo) -> str:
-    """ "HH:MM", as the pages show it."""
+    """The local time of day as the pages show it, "HH:MM"."""
     return instant.astimezone(zone).strftime("%H:%M")
 
 

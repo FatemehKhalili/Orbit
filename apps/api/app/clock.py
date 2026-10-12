@@ -24,5 +24,10 @@ def get_today(request: Request) -> date:
     return today_in(request.app.state.timezone, utc_now())
 
 
-# Endpoint parameter type: `def handler(today: TodayDep): ...`
+def get_timezone(request: Request) -> ZoneInfo:
+    return request.app.state.timezone
+
+
+# Endpoint parameter types: `def handler(today: TodayDep, zone: TimezoneDep): ...`
 TodayDep = Annotated[date, Depends(get_today)]
+TimezoneDep = Annotated[ZoneInfo, Depends(get_timezone)]

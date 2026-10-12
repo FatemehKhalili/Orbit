@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Request, Response
 
-from app.api import account, auth, habits, health, shopping, time
+from app.api import account, auth, calendar, habits, health, shopping, time
 from app.config import Settings, get_settings
 from app.database import create_database_engine, create_session_factory
 
@@ -69,5 +69,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(time.router)
     app.include_router(shopping.router)
     app.include_router(habits.router)
+    app.include_router(calendar.router)
     app.include_router(account.router)
     return app
