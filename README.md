@@ -14,7 +14,9 @@ one place.
 > complete, tagged `v0.3.0-phase3`. Phase 4 (Shopping, the first module) is complete,
 > tagged `v0.4.0-phase4`. Phase 5 (Habits) is complete, tagged `v0.5.0-phase5`. Phase 6
 > (running Orbit for real: production deployment, backups, sign-in throttling, export) is
-> complete, tagged `v0.6.0-phase6`. The other modules are placeholders.
+> complete, tagged `v0.6.0-phase6`. Phase 7 (Today Dashboard: check off today's habits and
+> the first shopping items from the Dashboard) is complete, tagged `v0.7.0-phase7`. The other
+> modules are placeholders.
 
 ## MVP modules
 

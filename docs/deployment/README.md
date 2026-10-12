@@ -18,7 +18,7 @@ Before you rely on Orbit, also read [Backups and recovery](backup-and-recovery.m
 ```bash
 git clone https://github.com/FatemehKhalili/Orbit.git orbit
 cd orbit
-git checkout v0.6.0-phase6               # a release tag, never a moving branch
+git checkout v0.7.0-phase7               # a release tag, never a moving branch
 ./scripts/setup-env.sh                   # .env with a random database password
 docker compose -f compose.production.yml up -d --build
 ```
