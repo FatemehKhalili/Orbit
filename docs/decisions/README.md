@@ -16,3 +16,5 @@ marked as superseded with a link to the replacement.
 | [0008](0008-dates-and-the-instance-timezone.md) | Dates and the instance timezone | Accepted |
 | [0009](0009-production-deployment-backups-and-upgrades.md) | Production deployment, backups, export and upgrades | Accepted |
 | [0010](0010-sign-in-throttling-and-known-devices.md) | Sign-in throttling and known devices | Accepted |
+| [0011](0011-calendar-events-and-time.md) | Calendar events and time | Accepted |
+| [0012](0012-google-calendar-sync.md) | Two-way Google Calendar sync | Proposed (Phase 9) |

@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-10-11
+- Amended by: [ADR 0011](0011-calendar-events-and-time.md) (times of day: stored as
+  instants, entered and shown in the instance timezone)
 
 ## Context
 
