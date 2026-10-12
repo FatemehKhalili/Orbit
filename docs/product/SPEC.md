@@ -223,3 +223,20 @@ Out of scope for Phase 6: import, built-in backup encryption or scheduling, clou
 targets, published images, several users, password reset by email, two-factor sign-in,
 metrics, a browser-test framework, the Node runtime upgrade and the open Dependabot
 updates.
+
+## Visual design
+
+After Phase 6, the web app was redesigned (PR #20) without changing the API, routes or
+forms. It ships with the next release.
+
+- **Look:** warm cream surfaces, lavender and plum for the brand, and blush, mint and peach
+  accents that each keep one meaning (mint for Habits, peach for Shopping, blush for
+  Wishlist). Dark mode follows the system setting with a deep plum palette.
+- **Layout:** a sidebar on wide screens and a scrolling row of modules on phones; a small
+  planet-and-moon logo; friendly empty and "could not load" states.
+- **Dashboard:** a greeting with today's date, read-only cards for today's habits and the
+  shopping list, the backend status, a seven-day habit chart and the module orbit.
+- **Rules for later work:** colours, radii, shadows, fonts and motion are tokens in
+  `apps/web/src/app/globals.css`, and components use only their semantic names. Layouts use
+  logical properties so right-to-left text mirrors, text meets WCAG AA contrast, keyboard
+  focus is always visible, and animation respects reduced motion. No web fonts are fetched.

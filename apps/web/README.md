@@ -13,9 +13,10 @@ npm run dev
 ```
 
 Open http://localhost:3000 and sign in with the owner account (create it with the API's
-`create-owner` command, see [apps/api/README.md](../api/README.md)). The dashboard shows a
-placeholder for the MVP modules and a **Backend** card that reports the API's
-`/health/ready` result. **Shopping** (`/shopping`) is the owner's shopping list.
+`create-owner` command, see [apps/api/README.md](../api/README.md)). The dashboard greets the
+owner with today's date and shows how many habits are done today, how many shopping items
+are left to buy, a **Backend** card that reports the API's `/health/ready` result, a
+seven-day habit chart and the module orbit. **Shopping** (`/shopping`) is the owner's shopping list.
 **Habits** (`/habits`) lists active habits, each with a strip of the last seven days to
 check off; `/habits/[id]/edit` edits, archives or restores one, and `/habits/archived` lists
 archived habits, which can be restored or deleted for good. The other modules have
@@ -77,7 +78,10 @@ without JavaScript. Every response carries security headers (`src/lib/security-h
 ## shadcn/ui
 
 `components.json` is configured. Add components with `npx shadcn@latest add <name>`.
-`card`, `badge`, `button`, `input` and `label` are in `src/components/ui`.
+`button`, `badge`, `card`, `input`, `textarea` and `label` are in `src/components/ui`,
+restyled with the design tokens in `src/app/globals.css`. Use the semantic token names
+(`bg-card`, `text-muted-foreground`, `bg-mint-soft`, …) rather than raw colours, so new
+components follow light and dark mode.
 
 ## Docker
 

@@ -27,7 +27,9 @@ apps/
                       one placeholder page per other module), account/export (the data
                       download), api/health
     src/proxy.ts      Sends requests without a session cookie to /login
-    src/components/   form-message.tsx (shared); ui/: shadcn/ui components (copied in, owned by us)
+    src/components/   Shared pieces: icons and illustrations (inline SVG), logo, page header,
+                      empty state, unavailable card, form message, module tones (modules.tsx);
+                      ui/: shadcn/ui components (copied in, restyled, owned by us)
     src/lib/          config.ts (env parsing), api-client.ts (calls the API), api-health.ts,
                       auth-api.ts, auth.ts and session.ts (session cookie), forms.ts and
                       form-actions.ts (shared form helpers), shopping-api.ts and shopping.ts,
@@ -139,10 +141,20 @@ Browser ──cookie──▶ web: proxy (cookie present?) ─▶ layout/page �
 ## Frontend
 
 - Next.js App Router with TypeScript, Tailwind CSS v4 and shadcn/ui (`components.json`
-  configured; `card` and `badge` added).
+  configured; `button`, `badge`, `card`, `input`, `textarea` and `label` copied in and
+  restyled).
+- Visual design: every colour, radius, shadow, font and motion value is a token in
+  `src/app/globals.css`, with light and dark (system setting) values. Components use only
+  the semantic token names. Cream surfaces, lavender and plum for the brand, and one
+  meaning per accent: mint for Habits, peach for Shopping, blush for Wishlist. Layouts use
+  logical properties so `dir="rtl"` mirrors; text pairs meet WCAG AA; animation is
+  `motion-safe` only. Fonts come from the system's rounded stack, so nothing is fetched at
+  build time.
 - `/login` is public. Everything under the `(app)` route group is signed in: the layout
-  shows the module navigation and a sign-out button; the dashboard renders on each request
-  and calls the API's readiness endpoint; Shopping has its list and an edit page; Habits has
+  shows the module navigation (a sidebar on wide screens, a scrolling row on phones) and a
+  sign-out button; the dashboard renders on each request and shows a greeting with today's
+  date, read-only cards for today's habits and the shopping list, the API's readiness, a
+  seven-day habit chart and the module orbit; Shopping has its list and an edit page; Habits has
   its list with a seven-day check-off strip, an edit page and an archived list; the other
   modules have placeholder pages. Dates come from the API (`GET /time`) and are formatted
   in UTC, so the web server's own timezone never shifts them.

@@ -114,7 +114,7 @@ one-owner rule, the admin CLI, the instance timezone, Shopping and Habits includ
 ownership with a second user, sign-in throttling, the export and production defaults
 (298 tests); web configuration, the API client, the session and device cookies, the shared
 form helpers, login, Shopping and Habits form logic, the seven-day strip, route
-protection, the export download, client addresses and security headers (190 tests);
+protection, the export download, client addresses and security headers (199 tests);
 and the end-to-end smoke test.
 
 Dependabot (`.github/dependabot.yml`) opens weekly update PRs for the API, the web app,
