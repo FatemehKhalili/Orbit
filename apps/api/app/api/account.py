@@ -22,13 +22,13 @@ from app import clock
 from app.auth.dependencies import CurrentUserDep
 from app.clock import TodayDep
 from app.database import SessionDep
-from app.models import Habit, HabitCheckIn, ShoppingItem
+from app.models import CalendarEvent, Habit, HabitCheckIn, ShoppingItem
 
 router = APIRouter(prefix="/account", tags=["account"])
 
 FORMAT = "orbit-export"
 # Major: a change that breaks readers. Minor: something added, such as a new module.
-FORMAT_VERSION = "1.0"
+FORMAT_VERSION = "1.1"
 
 # Every table and whether an export includes it. A test fails when a table is missing
 # here, so a new module has to decide (docs/export/README.md lists the same reasons).
@@ -37,6 +37,7 @@ EXPORTED_TABLES = {
     "shopping_items": "shopping.items",
     "habits": "habits.habits",
     "habit_check_ins": "habits.habits[].check_ins",
+    "calendar_events": "calendar.events",
 }
 EXCLUDED_TABLES = {
     "sessions": "authentication secrets (token hashes)",
@@ -90,17 +91,37 @@ class HabitsOut(_Out):
     )
 
 
+class CalendarEventOut(_Out):
+    id: uuid.UUID
+    title: str
+    notes: str | None
+    all_day: bool
+    start_day: date | None = Field(description="All-day events: the first day; else null")
+    end_day: date | None = Field(description="All-day events: the last day, inclusive; else null")
+    starts_at: datetime | None = Field(description="Timed events: the start; else null")
+    ends_at: datetime | None = Field(
+        description="Timed events: the end, equal to the start for a point in time; else null"
+    )
+    created_at: datetime
+    updated_at: datetime
+
+
+class CalendarOut(_Out):
+    events: list[CalendarEventOut] = Field(description="Every event, in the order added")
+
+
 class ExportOut(_Out):
     """An Orbit data export. Times are UTC timestamps; days are calendar dates."""
 
     format: Literal["orbit-export"]
-    format_version: Literal["1.0"]
+    format_version: Literal["1.1"]
     exported_at: datetime
     orbit_version: str
     timezone: str = Field(description="The instance timezone that defines calendar days")
     account: AccountOut
     shopping: ShoppingOut
     habits: HabitsOut
+    calendar: CalendarOut
 
 
 @router.get(
@@ -118,6 +139,11 @@ def export(
     ).all()
     habits = session.scalars(
         select(Habit).where(Habit.owner_id == user.id).order_by(Habit.created_at, Habit.id)
+    ).all()
+    events = session.scalars(
+        select(CalendarEvent)
+        .where(CalendarEvent.owner_id == user.id)
+        .order_by(CalendarEvent.created_at, CalendarEvent.id)
     ).all()
     check_ins: dict[uuid.UUID, list[CheckInOut]] = {habit.id: [] for habit in habits}
     for check_in in session.scalars(
@@ -168,6 +194,23 @@ def export(
                     check_ins=check_ins[habit.id],
                 )
                 for habit in habits
+            ]
+        ),
+        calendar=CalendarOut(
+            events=[
+                CalendarEventOut(
+                    id=event.id,
+                    title=event.title,
+                    notes=event.notes,
+                    all_day=event.all_day,
+                    start_day=event.start_day,
+                    end_day=event.end_day,
+                    starts_at=event.starts_at,
+                    ends_at=event.ends_at,
+                    created_at=event.created_at,
+                    updated_at=event.updated_at,
+                )
+                for event in events
             ]
         ),
     )

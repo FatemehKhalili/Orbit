@@ -26,6 +26,129 @@
       "title": "AccountOut",
       "type": "object"
     },
+    "CalendarEventOut": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "all_day": {
+          "title": "All Day",
+          "type": "boolean"
+        },
+        "start_day": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "All-day events: the first day; else null",
+          "title": "Start Day"
+        },
+        "end_day": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "All-day events: the last day, inclusive; else null",
+          "title": "End Day"
+        },
+        "starts_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Timed events: the start; else null",
+          "title": "Starts At"
+        },
+        "ends_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Timed events: the end, equal to the start for a point in time; else null",
+          "title": "Ends At"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "notes",
+        "all_day",
+        "start_day",
+        "end_day",
+        "starts_at",
+        "ends_at",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "CalendarEventOut",
+      "type": "object"
+    },
+    "CalendarOut": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "description": "Every event, in the order added",
+          "items": {
+            "$ref": "#/$defs/CalendarEventOut"
+          },
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "required": [
+        "events"
+      ],
+      "title": "CalendarOut",
+      "type": "object"
+    },
     "CheckInOut": {
       "additionalProperties": false,
       "properties": {
@@ -222,7 +345,7 @@
       "type": "string"
     },
     "format_version": {
-      "const": "1.0",
+      "const": "1.1",
       "title": "Format Version",
       "type": "string"
     },
@@ -248,6 +371,9 @@
     },
     "habits": {
       "$ref": "#/$defs/HabitsOut"
+    },
+    "calendar": {
+      "$ref": "#/$defs/CalendarOut"
     }
   },
   "required": [
@@ -258,7 +384,8 @@
     "timezone",
     "account",
     "shopping",
-    "habits"
+    "habits",
+    "calendar"
   ],
   "title": "Orbit data export, format 1",
   "type": "object"
