@@ -146,10 +146,11 @@ Browser ──cookie──▶ web: proxy (cookie present?) ─▶ layout/page �
 - Visual design: every colour, radius, shadow, font and motion value is a token in
   `src/app/globals.css`, with light and dark (system setting) values. Components use only
   the semantic token names. Cream surfaces, lavender and plum for the brand, and one
-  meaning per accent: mint for Habits, peach for Shopping, blush for Wishlist. Layouts use
-  logical properties so `dir="rtl"` mirrors; text pairs meet WCAG AA; animation is
-  `motion-safe` only. Fonts come from the system's rounded stack, so nothing is fetched at
-  build time.
+  meaning per accent: mint for Habits, peach for Shopping, blush for Wishlist (until
+  Finance is built, its placeholder tile borrows mint; its own tone is decided in its
+  phase). Layouts use logical properties so `dir="rtl"` mirrors; text pairs meet WCAG AA;
+  animation is `motion-safe` only. Fonts come from the system's rounded stack, so nothing
+  is fetched at build time.
 - `/login` is public. Everything under the `(app)` route group is signed in: the layout
   shows the module navigation (a sidebar on wide screens, a scrolling row on phones) and a
   sign-out button; the dashboard renders on each request and shows a greeting with today's
@@ -236,7 +237,7 @@ pre-upgrade backup into the previous release, never `alembic downgrade`.
 | API + DB     | `apps/api/tests` (`integration` marker, needs `TEST_DATABASE_URL`): readiness, migrations up/down, `alembic check`, sign-in, sessions, the one-owner constraint (including concurrent inserts), admin CLI, Shopping and Habits CRUD and ownership with a second user (`two_users_client`, ADR 0007), the check-in window across a day boundary, races with a concurrent delete | pytest |
 | Web unit     | `apps/web/src/**/*.test.ts`   | Vitest            |
 | Images       | `scripts/check-image.sh`      | Builds and starts each `runtime` image in CI |
-| End to end   | `scripts/smoke-test.sh`: health, security headers, then sign in (session and device cookies), add, check, edit and delete a shopping item, download the export, add a habit, check and un-check today, archive, restore and delete it, and sign out, all through the web forms | curl, against Compose (development, production and HTTPS) |
+| End to end   | `scripts/smoke-test.sh`: health, security headers, then sign in (session and device cookies), add, check, edit and delete a shopping item and check one off from the Dashboard, download the export, add a habit, check and un-check today on the Habits page and on the Dashboard, archive, restore and delete it, and sign out, all through the web forms | curl, against Compose (development, production and HTTPS) |
 | Operations   | CI jobs "Backup and restore" and "Upgrade from v0.6.0-phase6": data fingerprints (`scripts/db-fingerprint.sh`), export and sign-in identical across backup, volume loss and restore; in-place upgrade of the production stack, a smoke test on the upgraded data, and rollback by restore | Compose, on throwaway volumes |
 
 ## Open questions

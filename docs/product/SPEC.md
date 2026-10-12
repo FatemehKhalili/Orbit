@@ -232,7 +232,8 @@ forms. It ships with the next release.
 
 - **Look:** warm cream surfaces, lavender and plum for the brand, and blush, mint and peach
   accents that each keep one meaning (mint for Habits, peach for Shopping, blush for
-  Wishlist). Dark mode follows the system setting with a deep plum palette.
+  Wishlist). Until Finance is built, its placeholder tile borrows mint; Finance's own tone
+  is decided in its phase. Dark mode follows the system setting with a deep plum palette.
 - **Layout:** a sidebar on wide screens and a scrolling row of modules on phones; a small
   planet-and-moon logo; friendly empty and "could not load" states.
 - **Dashboard:** a greeting with today's date, read-only cards for today's habits and the
