@@ -11,7 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UnavailableCard } from "@/components/unavailable-card";
 import { getSessionToken, requireUser } from "@/lib/auth";
-import { formatLongDate, summarize } from "@/lib/habits";
+import { allDoneToday, formatLongDate, summarize } from "@/lib/habits";
 import { getTime, listHabits } from "@/lib/habits-api";
 import { LOGIN_PATH } from "@/lib/routes";
 
@@ -61,7 +61,9 @@ export default async function HabitsPage() {
           <Card data-testid="habit-list">
             <CardHeader className="grid-cols-[1fr_auto] items-center">
               <CardTitle>Your habits</CardTitle>
-              <Badge variant="success">{summarize(habits.data, time.data.today)}</Badge>
+              <Badge variant={allDoneToday(habits.data, time.data.today) ? "success" : "default"}>
+                {summarize(habits.data, time.data.today)}
+              </Badge>
               <CardDescription className="col-span-2">
                 Check off today or any of the six days before.
               </CardDescription>

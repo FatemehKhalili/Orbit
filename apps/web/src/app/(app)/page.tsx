@@ -11,9 +11,16 @@ import { Badge, BadgeDot } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { checkApiHealth, type ApiHealth } from "@/lib/api-health";
 import { getSessionToken, requireUser } from "@/lib/auth";
-import { formatLongDate, weekActivity, type DayActivity } from "@/lib/habits";
+import {
+  allDoneToday,
+  countDoneToday,
+  formatLongDate,
+  weekActivity,
+  type DayActivity,
+} from "@/lib/habits";
 import { getTime, listHabits } from "@/lib/habits-api";
 import { LOGIN_PATH, MODULES } from "@/lib/routes";
+import { countToBuy } from "@/lib/shopping";
 import { listShoppingItems } from "@/lib/shopping-api";
 import { cn } from "@/lib/utils";
 
@@ -54,9 +61,8 @@ export default async function DashboardPage() {
   const habitList = habits?.ok ? habits.data : null;
   const itemList = items?.ok ? items.data : null;
 
-  const doneToday =
-    today && habitList ? habitList.filter((h) => h.checkIns.includes(today)).length : 0;
-  const toBuy = itemList ? itemList.filter((item) => !item.checked).length : 0;
+  const doneToday = today && habitList ? countDoneToday(habitList, today) : 0;
+  const toBuy = itemList ? countToBuy(itemList) : 0;
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8 lg:px-8 lg:py-10">
@@ -89,7 +95,7 @@ export default async function DashboardPage() {
               ? "Could not be loaded right now."
               : habitList.length === 0
                 ? "Plant your first habit."
-                : doneToday === habitList.length
+                : allDoneToday(habitList, today)
                   ? "All done. Lovely work!"
                   : `${habitList.length - doneToday} still to go.`
           }
@@ -351,7 +357,7 @@ function OrbitDiagram() {
       <div aria-hidden className="motion-safe:animate-orbit absolute inset-[10%]">
         <span className="bg-blush ring-card absolute top-0 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2" />
       </div>
-      <div className="bg-lavender/60 text-primary absolute top-1/2 left-1/2 flex size-22 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-display text-sm font-bold shadow-[inset_-8px_-8px_0_0_rgb(255_255_255/0.25)]">
+      <div className="bg-lavender-soft text-lavender-ink absolute top-1/2 left-1/2 flex size-22 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full font-display text-sm font-bold shadow-[inset_-8px_-8px_0_0_rgb(255_255_255/0.25)]">
         You
       </div>
       <ul>

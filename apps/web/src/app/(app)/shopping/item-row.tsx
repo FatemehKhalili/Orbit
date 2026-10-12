@@ -36,9 +36,9 @@ export function ItemRow({ item }: { item: ShoppingItem }) {
             disabled={toggling || deleting}
             aria-label={`Mark “${item.name}” as ${item.checked ? "not bought" : "bought"}`}
             className={cn(
-              "flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 outline-none focus-visible:ring-4 focus-visible:ring-ring/35 active:scale-90",
+              "flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card active:scale-90",
               checked
-                ? "bg-mint border-mint text-white dark:text-background"
+                ? "bg-mint border-mint text-mint-foreground"
                 : "border-border-strong bg-card hover:border-mint hover:bg-mint-soft",
             )}
           >

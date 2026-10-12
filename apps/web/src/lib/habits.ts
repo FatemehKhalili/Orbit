@@ -213,11 +213,20 @@ export function buildWeek(today: Day, checkIns: Day[]): WeekDay[] {
   });
 }
 
+/** How many of the habits were done today. */
+export function countDoneToday(habits: Pick<Habit, "checkIns">[], today: Day): number {
+  return habits.filter((habit) => habit.checkIns.includes(today)).length;
+}
+
+/** Whether there are habits and every one of them was done today. */
+export function allDoneToday(habits: Pick<Habit, "checkIns">[], today: Day): boolean {
+  return habits.length > 0 && countDoneToday(habits, today) === habits.length;
+}
+
 /** "2 of 3 done today", for the list heading. */
 export function summarize(habits: Pick<Habit, "checkIns">[], today: Day): string {
   if (habits.length === 0) return "No habits yet";
-  const doneToday = habits.filter((habit) => habit.checkIns.includes(today)).length;
-  return `${doneToday} of ${habits.length} done today`;
+  return `${countDoneToday(habits, today)} of ${habits.length} done today`;
 }
 
 export type DayActivity = Omit<WeekDay, "done"> & {
