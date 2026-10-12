@@ -57,7 +57,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               <DownloadIcon className="size-4 shrink-0" />
               <span className="sr-only lg:not-sr-only">Download my data</span>
             </a>
-            <form action={logout} className="contents">
+            <form action={logout} className="contents" data-testid="sign-out-form">
               <Button
                 type="submit"
                 variant="ghost"

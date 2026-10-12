@@ -222,10 +222,13 @@ jobs:
         run: docker compose down --volumes
 
   upgrade:
-    name: Upgrade from v0.5.0-phase5 and roll back
+    name: Upgrade from v0.6.0-phase6 and roll back
     runs-on: ubuntu-latest
     needs: [api, web]
     env:
+      # Both releases run their own production stack. They share the project name
+      # (orbit-production), so the new code starts on the old release's data volume.
+      COMPOSE_FILE: compose.production.yml:.github/compose.production.ci.yml
       ORBIT_CI_EMAIL: owner@example.com
       ORBIT_CI_PASSWORD: ci-only-owner-password
     steps:
@@ -233,55 +236,45 @@ jobs:
         with:
           fetch-depth: 0
       - run: |
-          echo "OLD=$RUNNER_TEMP/v0.5.0-phase5" >> "$GITHUB_ENV"
+          echo "OLD=$RUNNER_TEMP/v0.6.0-phase6" >> "$GITHUB_ENV"
           echo "BACKUPS=$RUNNER_TEMP/backups" >> "$GITHUB_ENV"
-      - name: Run v0.5.0-phase5 (its development Compose setup, the only one it had)
+      - name: Run v0.6.0-phase6 (its production Compose setup)
         run: |
-          git worktree add "$OLD" v0.5.0-phase5
+          git worktree add "$OLD" v0.6.0-phase6
           (cd "$OLD" && ./scripts/setup-env.sh && docker compose up --build --detach --wait)
           cp "$OLD/.env" .env
-      - name: Seed data on v0.5.0 and record it
+      - name: Seed data on v0.6.0 and back it up, as the upgrade guide says
         run: |
-          export ORBIT_COMPOSE_FILE="$OLD/docker-compose.yml"
+          export ORBIT_COMPOSE_FILE="$OLD/compose.production.yml"
           .github/scripts/orbit-data.sh seed
           echo "TOKEN=$(.github/scripts/orbit-data.sh token)" >> "$GITHUB_ENV"
-          ./scripts/db-fingerprint.sh | tee "$RUNNER_TEMP/v05.txt"
+          ./scripts/db-fingerprint.sh | tee "$RUNNER_TEMP/v06.txt"
           ./scripts/backup.sh "$BACKUPS"
       - name: Upgrade in place (same data volume, new code)
         run: |
           (cd "$OLD" && docker compose down)
           docker compose up --build --detach --wait
+          test "$(docker compose ps -a --format '{{.ExitCode}}' migrate)" = 0
           docker compose exec -T api alembic check
       - name: Upgraded data is unchanged, and the old session and password work
-        env:
-          ORBIT_COMPOSE_FILE: docker-compose.yml
         run: |
-          ./scripts/db-fingerprint.sh | grep -Ev '^(alembic_version|login_devices|login_throttles) ' > "$RUNNER_TEMP/v06.txt"
-          grep -v '^alembic_version ' "$RUNNER_TEMP/v05.txt" | diff - "$RUNNER_TEMP/v06.txt"
+          ./scripts/db-fingerprint.sh | diff "$RUNNER_TEMP/v06.txt" -
           .github/scripts/orbit-data.sh export "$TOKEN" | jq -e '(.shopping.items | length) == 40 and (.habits.habits | map(.check_ins | length) | add) == 1004'
           .github/scripts/orbit-data.sh token > /dev/null
-      - name: Roll back to v0.5.0 by restoring the pre-upgrade backup
+      - name: Smoke test on the upgraded data
+        env:
+          ORBIT_SMOKE_EMAIL: owner@example.com
+          ORBIT_SMOKE_PASSWORD: ci-only-owner-password
+        run: ./scripts/smoke-test.sh
+      - name: Roll back to v0.6.0 by restoring the pre-upgrade backup
         run: |
-          export ORBIT_COMPOSE_FILE="$OLD/docker-compose.yml"
           docker compose down
           (cd "$OLD" && docker compose up --detach --wait db)
           echo orbit | ./scripts/restore.sh --force "$BACKUPS"/orbit-*.dump
-          ./scripts/db-fingerprint.sh | diff "$RUNNER_TEMP/v05.txt" -
+          ./scripts/db-fingerprint.sh | diff "$RUNNER_TEMP/v06.txt" -
           (cd "$OLD" && docker compose up --detach --wait)
           .github/scripts/orbit-data.sh token > /dev/null
           (cd "$OLD" && docker compose exec -T api alembic check)
-      - name: Move the v0.5.0 backup to a fresh production install
-        env:
-          COMPOSE_FILE: compose.production.yml:.github/compose.production.ci.yml
-        run: |
-          (cd "$OLD" && env -u COMPOSE_FILE docker compose down --volumes)
-          docker compose up --detach --wait db
-          ./scripts/restore.sh "$BACKUPS"/orbit-*.dump
-          docker compose up --build --detach --wait
-          docker compose exec -T api alembic check
-          ./scripts/db-fingerprint.sh | grep -Ev '^(alembic_version|login_devices|login_throttles) ' > "$RUNNER_TEMP/prod.txt"
-          grep -v '^alembic_version ' "$RUNNER_TEMP/v05.txt" | diff - "$RUNNER_TEMP/prod.txt"
-          .github/scripts/orbit-data.sh export "$TOKEN" | jq -e '.shopping.items | length == 40'
       - if: failure()
         run: |
           docker compose logs

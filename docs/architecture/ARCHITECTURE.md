@@ -153,8 +153,10 @@ Browser ──cookie──▶ web: proxy (cookie present?) ─▶ layout/page �
 - `/login` is public. Everything under the `(app)` route group is signed in: the layout
   shows the module navigation (a sidebar on wide screens, a scrolling row on phones) and a
   sign-out button; the dashboard renders on each request and shows a greeting with today's
-  date, read-only cards for today's habits and the shopping list, the API's readiness, a
-  seven-day habit chart and the module orbit; Shopping has its list and an edit page; Habits has
+  date, summary cards for today's habits and the shopping list, the API's readiness,
+  cards to check off today's habits and the first five unchecked items (with the Habits
+  and Shopping Server Actions, which refresh the Dashboard too), a seven-day habit chart
+  and the module orbit; Shopping has its list and an edit page; Habits has
   its list with a seven-day check-off strip, an edit page and an archived list; the other
   modules have placeholder pages. Dates come from the API (`GET /time`) and are formatted
   in UTC, so the web server's own timezone never shifts them.
@@ -235,7 +237,7 @@ pre-upgrade backup into the previous release, never `alembic downgrade`.
 | Web unit     | `apps/web/src/**/*.test.ts`   | Vitest            |
 | Images       | `scripts/check-image.sh`      | Builds and starts each `runtime` image in CI |
 | End to end   | `scripts/smoke-test.sh`: health, security headers, then sign in (session and device cookies), add, check, edit and delete a shopping item, download the export, add a habit, check and un-check today, archive, restore and delete it, and sign out, all through the web forms | curl, against Compose (development, production and HTTPS) |
-| Operations   | CI jobs "Backup and restore" and "Upgrade from v0.5.0-phase5": data fingerprints (`scripts/db-fingerprint.sh`), export and sign-in identical across backup, volume loss and restore; in-place upgrade, rollback by restore, and a move into the production stack | Compose, on throwaway volumes |
+| Operations   | CI jobs "Backup and restore" and "Upgrade from v0.6.0-phase6": data fingerprints (`scripts/db-fingerprint.sh`), export and sign-in identical across backup, volume loss and restore; in-place upgrade of the production stack, a smoke test on the upgraded data, and rollback by restore | Compose, on throwaway volumes |
 
 ## Open questions
 

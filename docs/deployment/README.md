@@ -165,7 +165,7 @@ docker compose -f compose.production.yml up -d --build
 Restore first, with the scripts of the version you are leaving, then check out the
 previous release and start it. (`v0.5.0-phase5` had only the development setup: to go
 back to it, restore into its `docker-compose.yml` stack instead, with
-`ORBIT_COMPOSE_FILE` pointing at that file. CI tests exactly this.)
+`ORBIT_COMPOSE_FILE` pointing at that file. CI tested this up to `v0.6.0-phase6`.)
 
 Never roll back with `alembic downgrade`. Downgrade migrations can delete columns and
 tables; the backup is what brings back exactly the data you had. The restore keeps the
@@ -187,7 +187,8 @@ docker compose -f compose.production.yml up -d --build
 ```
 
 The restore works from any earlier Orbit version: the migrate step brings it up to date.
-CI does exactly this with a backup from `v0.5.0-phase5` on every change.
+CI did exactly this with a backup from `v0.5.0-phase5` up to `v0.6.0-phase6`; it now
+upgrades a `v0.6.0-phase6` production install in place, and rolls it back, on every change.
 
 ## Remove Orbit
 
