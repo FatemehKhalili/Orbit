@@ -1,6 +1,7 @@
 """ORM models. Every model module is imported here so Alembic sees all tables."""
 
 from app.models.base import NAMING_CONVENTION, Base
+from app.models.calendar import CalendarEvent
 from app.models.habits import Habit, HabitCheckIn
 from app.models.login import LoginDevice, LoginThrottle
 from app.models.session import AuthSession
@@ -11,6 +12,7 @@ __all__ = [
     "NAMING_CONVENTION",
     "AuthSession",
     "Base",
+    "CalendarEvent",
     "Habit",
     "HabitCheckIn",
     "LoginDevice",

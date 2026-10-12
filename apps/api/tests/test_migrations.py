@@ -6,7 +6,7 @@ from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from pydantic import ValidationError
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 from app.config import Settings, get_settings
 
@@ -69,6 +69,7 @@ def test_migrations_upgrade_downgrade_and_match_the_models(database_url_from_env
             "habit_check_ins",
             "login_throttles",
             "login_devices",
+            "calendar_events",
         } <= set(inspector.get_table_names())
         assert {c["name"] for c in inspector.get_unique_constraints("users")} == {
             "uq_users_email",
@@ -109,12 +110,85 @@ def test_migrations_upgrade_downgrade_and_match_the_models(database_url_from_env
         assert device_fk["name"] == "fk_login_devices_user_id_users"
         assert device_fk["options"]["ondelete"] == "CASCADE"
 
+        assert {c["name"] for c in inspector.get_check_constraints("calendar_events")} == {
+            "ck_calendar_events_shape",
+            "ck_calendar_events_end_not_before_start",
+        }
+        [calendar_fk] = inspector.get_foreign_keys("calendar_events")
+        assert calendar_fk["name"] == "fk_calendar_events_owner_id_users"
+        assert calendar_fk["options"]["ondelete"] == "CASCADE"
+        assert [ix["name"] for ix in inspector.get_indexes("calendar_events")] == [
+            "ix_calendar_events_owner_id"
+        ]
+
         # Models and migrations agree: autogenerate would produce no changes.
         command.check(config)
 
         command.downgrade(config, "base")
         assert inspect(engine).get_table_names() == ["alembic_version"]
         command.upgrade(config, "head")
+    finally:
+        command.downgrade(config, "base")
+        engine.dispose()
+
+
+@pytest.mark.integration
+@pytest.mark.skipif("TEST_DATABASE_URL" not in os.environ, reason="TEST_DATABASE_URL not set")
+def test_calendar_migration_is_additive(database_url_from_env):
+    """Upgrading from Phase 7's schema keeps every existing row as it was, and going back
+    removes only the new table (Phase 8, ADR 0011)."""
+    database_url_from_env(os.environ["TEST_DATABASE_URL"])
+    config = alembic_config()
+    url = Settings(DATABASE_URL=os.environ["TEST_DATABASE_URL"], _env_file=None).database_url
+    engine = create_engine(url.get_secret_value())
+    tables = ("users", "shopping_items", "habits", "habit_check_ins")
+
+    def snapshot() -> dict[str, list[str]]:
+        with engine.connect() as connection:
+            return {
+                table: sorted(
+                    connection.execute(text(f"SELECT t::text FROM {table} AS t")).scalars()
+                )
+                for table in tables
+            }
+
+    try:
+        command.downgrade(config, "base")
+        command.upgrade(config, "73cc32af0338")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (id, email, display_name, password_hash, is_owner)"
+                    " VALUES (gen_random_uuid(), 'owner@example.com', 'Owner', 'x', true)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO shopping_items (id, owner_id, name)"
+                    " SELECT gen_random_uuid(), id, 'Milk' FROM users"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO habits (id, owner_id, name)"
+                    " SELECT gen_random_uuid(), id, 'Read' FROM users"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO habit_check_ins (id, owner_id, habit_id, day)"
+                    " SELECT gen_random_uuid(), owner_id, id, DATE '2026-10-11' FROM habits"
+                )
+            )
+        before = snapshot()
+
+        command.upgrade(config, "head")
+        assert snapshot() == before
+        assert "calendar_events" in inspect(engine).get_table_names()
+
+        command.downgrade(config, "73cc32af0338")
+        assert snapshot() == before
+        assert "calendar_events" not in inspect(engine).get_table_names()
     finally:
         command.downgrade(config, "base")
         engine.dispose()
