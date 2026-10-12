@@ -41,7 +41,8 @@ and self-hostable, so a person's life data stays under their control.
 | 4     | Shopping: the first module, one personal shopping list per owner     | Complete    |
 | 5     | Habits: daily habits checked off over the last seven days, archive and delete, one instance timezone | Complete    |
 | 6     | Run Orbit for real: production deployment, backup and restore, sign-in throttling, data export, upgrade and rollback | Complete    |
-| 7+    | To be defined                                                         | Not started |
+| 7     | Today Dashboard: check off today's habits and the first shopping items from the Dashboard | In progress |
+| 8+    | To be defined                                                         | Not started |
 
 Phase 1 delivers no product features. The web app shows a placeholder with the six
 modules and the backend's health.
@@ -240,3 +241,49 @@ forms. It ships with the next release.
   `apps/web/src/app/globals.css`, and components use only their semantic names. Layouts use
   logical properties so right-to-left text mirrors, text meets WCAG AA contrast, keyboard
   focus is always visible, and animation respects reduced motion. No web fonts are fetched.
+
+## Phase 7: Today Dashboard
+
+Phase 7 makes the Dashboard something to act on, not only to read. It adds no module, no
+API route, no table and no dependency, and it keeps the redesigned Dashboard's look and
+card placement. Calendar, Finance and Wishlist stay placeholders.
+
+**What the owner can do:**
+
+- In a **Today's habits** card, see every active habit with a check button for today, and
+  check it off or un-check it.
+- In a **To buy** card, see the first five unchecked shopping items, in the order the
+  Shopping page shows them, and check one off. When more are left, a link says how many
+  and goes to the Shopping page.
+
+**Rules:**
+
+- Only today can be changed from the Dashboard; earlier days stay on the Habits page.
+  "Today" comes from the API (`GET /time`, ADR 0008), never from the browser's clock.
+- The Dashboard uses the same Server Actions, API calls and form helpers as the Habits and
+  Shopping pages. Every module action also refreshes the Dashboard, so its counts, the
+  week chart and the new cards always come from the same fresh data.
+- Each form carries the state it switches to, so a repeated or doubled submit cannot flip
+  it back. A button is disabled while its change is on the way and shows where it is
+  going. A failure (for example the habit was archived, or the item deleted, in another
+  tab) shows the module page's message under that row and leaves the button ready to try
+  again.
+- Archived habits and checked items never appear in the new cards. If a module cannot be
+  loaded, its card says so and the rest of the Dashboard still works.
+
+**Look:** the greeting, the three summary cards, the week chart and the module orbit keep
+their place; the two new cards sit in one row between the summary cards and the week
+chart (side by side on wide screens, stacked on phones). Habits use mint and Shopping uses
+peach, from the existing design tokens. Everything works without JavaScript, in dark mode
+and right to left, with visible keyboard focus.
+
+**Testing:** web unit tests cover the Dashboard's view of today's habits and the shopping
+preview (counts matching the summary cards, ordering, the five-item limit, archived and
+checked rows left out), the target-state form fields, failure and retry, and the Dashboard
+refresh after every module action. The smoke test checks a habit off for today and an item
+off from the Dashboard's own forms, reloads the Dashboard to see the counts, and un-checks
+the habit. The upgrade job now starts from `v0.6.0-phase6`.
+
+Out of scope for Phase 7: adding, editing or deleting from the Dashboard, earlier days,
+undo, reordering or hiding cards, streaks and statistics, notifications, and any Calendar,
+Finance or Wishlist content.
