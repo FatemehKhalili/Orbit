@@ -27,3 +27,23 @@ export function sessionCookieOptions(expiresAt: Date, env: Env = process.env) {
     expires: expiresAt,
   };
 }
+
+/**
+ * The device cookie (ADR 0010). It holds a random token the API gave this browser at its
+ * first successful sign-in; the API stores only its hash. It is not a credential: it never
+ * replaces the password. It only lets this browser's sign-ins be throttled on their own,
+ * so someone guessing the owner's password cannot lock the owner out of this browser.
+ */
+export const DEVICE_COOKIE = "orbit_device";
+
+const DEVICE_COOKIE_DAYS = 365;
+
+export function deviceCookieOptions(env: Env = process.env) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    path: "/",
+    secure: secureCookiesEnabled(env),
+    maxAge: DEVICE_COOKIE_DAYS * 24 * 60 * 60,
+  };
+}

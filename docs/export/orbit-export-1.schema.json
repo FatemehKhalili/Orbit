@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "AccountOut": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "title": "Email",
+          "type": "string"
+        },
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "email",
+        "display_name",
+        "created_at"
+      ],
+      "title": "AccountOut",
+      "type": "object"
+    },
+    "CheckInOut": {
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "description": "A calendar day in the instance timezone (ADR 0008)",
+          "format": "date",
+          "title": "Day",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "day",
+        "created_at"
+      ],
+      "title": "CheckInOut",
+      "type": "object"
+    },
+    "HabitOut": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "archived_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Null while the habit is active",
+          "title": "Archived At"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "check_ins": {
+          "description": "Every day the habit was done, oldest first",
+          "items": {
+            "$ref": "#/$defs/CheckInOut"
+          },
+          "title": "Check Ins",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "notes",
+        "archived_at",
+        "created_at",
+        "updated_at",
+        "check_ins"
+      ],
+      "title": "HabitOut",
+      "type": "object"
+    },
+    "HabitsOut": {
+      "additionalProperties": false,
+      "properties": {
+        "habits": {
+          "description": "Every habit, active and archived, in the order added",
+          "items": {
+            "$ref": "#/$defs/HabitOut"
+          },
+          "title": "Habits",
+          "type": "array"
+        }
+      },
+      "required": [
+        "habits"
+      ],
+      "title": "HabitsOut",
+      "type": "object"
+    },
+    "ShoppingItemOut": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Quantity"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notes"
+        },
+        "checked": {
+          "title": "Checked",
+          "type": "boolean"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "quantity",
+        "notes",
+        "checked",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "ShoppingItemOut",
+      "type": "object"
+    },
+    "ShoppingOut": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "description": "Every item, in the order added",
+          "items": {
+            "$ref": "#/$defs/ShoppingItemOut"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "ShoppingOut",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "An Orbit data export. Times are UTC timestamps; days are calendar dates.",
+  "properties": {
+    "format": {
+      "const": "orbit-export",
+      "title": "Format",
+      "type": "string"
+    },
+    "format_version": {
+      "const": "1.0",
+      "title": "Format Version",
+      "type": "string"
+    },
+    "exported_at": {
+      "format": "date-time",
+      "title": "Exported At",
+      "type": "string"
+    },
+    "orbit_version": {
+      "title": "Orbit Version",
+      "type": "string"
+    },
+    "timezone": {
+      "description": "The instance timezone that defines calendar days",
+      "title": "Timezone",
+      "type": "string"
+    },
+    "account": {
+      "$ref": "#/$defs/AccountOut"
+    },
+    "shopping": {
+      "$ref": "#/$defs/ShoppingOut"
+    },
+    "habits": {
+      "$ref": "#/$defs/HabitsOut"
+    }
+  },
+  "required": [
+    "format",
+    "format_version",
+    "exported_at",
+    "orbit_version",
+    "timezone",
+    "account",
+    "shopping",
+    "habits"
+  ],
+  "title": "Orbit data export, format 1",
+  "type": "object"
+}

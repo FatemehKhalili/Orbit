@@ -60,7 +60,16 @@ def test_migrations_upgrade_downgrade_and_match_the_models(database_url_from_env
     try:
         command.upgrade(config, "head")
         inspector = inspect(engine)
-        assert {"alembic_version", "users", "sessions"} <= set(inspector.get_table_names())
+        assert {
+            "alembic_version",
+            "users",
+            "sessions",
+            "shopping_items",
+            "habits",
+            "habit_check_ins",
+            "login_throttles",
+            "login_devices",
+        } <= set(inspector.get_table_names())
         assert {c["name"] for c in inspector.get_unique_constraints("users")} == {
             "uq_users_email",
             "uq_users_is_owner",
@@ -71,6 +80,34 @@ def test_migrations_upgrade_downgrade_and_match_the_models(database_url_from_env
         assert [fk["name"] for fk in inspector.get_foreign_keys("sessions")] == [
             "fk_sessions_user_id_users"
         ]
+        [shopping_fk] = inspector.get_foreign_keys("shopping_items")
+        assert shopping_fk["name"] == "fk_shopping_items_owner_id_users"
+        assert shopping_fk["options"]["ondelete"] == "CASCADE"
+        assert [ix["name"] for ix in inspector.get_indexes("shopping_items")] == [
+            "ix_shopping_items_owner_id"
+        ]
+        assert {c["name"] for c in inspector.get_unique_constraints("habits")} == {
+            "uq_habits_id_owner_id"
+        }
+        check_in_fks = {fk["name"]: fk for fk in inspector.get_foreign_keys("habit_check_ins")}
+        assert set(check_in_fks) == {
+            "fk_habit_check_ins_habit_id_owner_id_habits",
+            "fk_habit_check_ins_owner_id_users",
+        }
+        habit_fk = check_in_fks["fk_habit_check_ins_habit_id_owner_id_habits"]
+        assert habit_fk["constrained_columns"] == ["habit_id", "owner_id"]
+        assert habit_fk["referred_columns"] == ["id", "owner_id"]
+        assert habit_fk["options"]["ondelete"] == "CASCADE"
+        assert {c["name"] for c in inspector.get_unique_constraints("habit_check_ins")} == {
+            "uq_habit_check_ins_habit_id_day"
+        }
+
+        assert [c["name"] for c in inspector.get_unique_constraints("login_devices")] == [
+            "uq_login_devices_token_hash"
+        ]
+        [device_fk] = inspector.get_foreign_keys("login_devices")
+        assert device_fk["name"] == "fk_login_devices_user_id_users"
+        assert device_fk["options"]["ondelete"] == "CASCADE"
 
         # Models and migrations agree: autogenerate would produce no changes.
         command.check(config)

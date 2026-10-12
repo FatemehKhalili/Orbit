@@ -6,7 +6,12 @@ import { cache } from "react";
 
 import { fetchCurrentUser, type CurrentUser, type User } from "@/lib/auth-api";
 import { LOGIN_PATH } from "@/lib/routes";
-import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
+import {
+  DEVICE_COOKIE,
+  deviceCookieOptions,
+  SESSION_COOKIE,
+  sessionCookieOptions,
+} from "@/lib/session";
 
 export async function getSessionToken(): Promise<string | undefined> {
   return (await cookies()).get(SESSION_COOKIE)?.value || undefined;
@@ -15,6 +20,15 @@ export async function getSessionToken(): Promise<string | undefined> {
 /** Only in Server Actions or Route Handlers: cookies cannot be set while rendering. */
 export async function startSession(token: string, expiresAt: Date): Promise<void> {
   (await cookies()).set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
+}
+
+export async function getDeviceToken(): Promise<string | undefined> {
+  return (await cookies()).get(DEVICE_COOKIE)?.value || undefined;
+}
+
+/** Only in Server Actions or Route Handlers. Kept across sign-outs: it is not a session. */
+export async function rememberDevice(deviceToken: string): Promise<void> {
+  (await cookies()).set(DEVICE_COOKIE, deviceToken, deviceCookieOptions());
 }
 
 export async function clearSession(): Promise<void> {

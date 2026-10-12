@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { SESSION_COOKIE, secureCookiesEnabled, sessionCookieOptions } from "./session";
+import {
+  DEVICE_COOKIE,
+  deviceCookieOptions,
+  SESSION_COOKIE,
+  secureCookiesEnabled,
+  sessionCookieOptions,
+} from "./session";
 
 const expires = new Date("2026-11-01T00:00:00Z");
 
@@ -44,5 +50,22 @@ describe("secureCookiesEnabled", () => {
     expect(secureCookiesEnabled({ NODE_ENV: "production", ORBIT_INSECURE_COOKIES: value })).toBe(
       true,
     );
+  });
+});
+
+describe("deviceCookieOptions", () => {
+  it("keeps the device token from scripts for a year, Secure like the session", () => {
+    expect(DEVICE_COOKIE).toBe("orbit_device");
+    expect(deviceCookieOptions({})).toEqual({
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: false,
+      maxAge: 365 * 24 * 60 * 60,
+    });
+    expect(deviceCookieOptions({ NODE_ENV: "production" }).secure).toBe(true);
+    expect(
+      deviceCookieOptions({ NODE_ENV: "production", ORBIT_INSECURE_COOKIES: "true" }).secure,
+    ).toBe(false);
   });
 });

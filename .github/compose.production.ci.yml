@@ -1,0 +1,7 @@
+# CI only: publishes the production API on 127.0.0.1:8000 so the smoke test and the
+# restore checks can call it directly. A real install never publishes the API
+# (compose.production.yml, ADR 0009).
+services:
+  api:
+    ports:
+      - "127.0.0.1:8000:8000"

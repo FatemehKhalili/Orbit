@@ -1,7 +1,12 @@
 #!/usr/bin/env sh
 # Check a running stack end to end: health endpoints, then the owner signing in and out
-# through the web app's login form (proving web -> API -> database and the session cookie).
+# through the web app's login form (proving web -> API -> database and the session cookie),
+# and using the Shopping list and Habits through their forms in between.
 # Usage: ./scripts/smoke-test.sh   (after `docker compose up`)
+#
+# For the production stack, point Compose at it (COMPOSE_FILE=compose.production.yml plus
+# an override that publishes the API, as CI does). With WEB_URL on https://, the cookies
+# must also be Secure.
 #
 # Signing in needs an owner. With ORBIT_SMOKE_EMAIL and ORBIT_SMOKE_PASSWORD set, the
 # script uses that account. Otherwise it creates a throwaway owner through Docker Compose,
@@ -34,14 +39,21 @@ status_of() {
 }
 
 # Submit the form on a web page the way a browser without JavaScript would: copy the
-# page's hidden Server Action fields, add the given fields, post it back to the same URL.
+# form's hidden Server Action fields, add the given fields, post it back to the same URL.
+# With FORM set, use the form with that data-testid; otherwise the page's only form.
 # Writes the response headers to $WORK/headers.
 submit_form() {
   page=$1 session=$2
   shift 2
   curl -fsS --max-time 10 ${session:+-H "Cookie: $COOKIE=$session"} "$page" > "$WORK/page.html" \
     || fail "could not load $page"
-  grep -o '<input type="hidden" name="[^"]*"\( value="[^"]*"\)\{0,1\}/>' "$WORK/page.html" \
+  if [ -n "${FORM:-}" ]; then
+    tr -d '\n' < "$WORK/page.html" | grep -o "<form[^>]*data-testid=\"$FORM\".*" \
+      | sed 's#</form>.*##' > "$WORK/form.html" || fail "no form $FORM on $page"
+  else
+    cp "$WORK/page.html" "$WORK/form.html"
+  fi
+  grep -o '<input type="hidden" name="[^"]*"\( value="[^"]*"\)\{0,1\}/>' "$WORK/form.html" \
     | sed -e 's/<input type="hidden" name="\([^"]*\)"\( value="\(.*\)"\)\{0,1\}\/>/\1=\3/' \
           -e 's/&quot;/"/g' -e 's/&amp;/\&/g' > "$WORK/fields"
   [ -s "$WORK/fields" ] || fail "no form found on $page"
@@ -64,6 +76,18 @@ case $(status_of "$WEB_URL/") in
 esac
 check "web login page"     "$WEB_URL/login"        'Sign in'
 
+curl -fsS -o /dev/null -D "$WORK/headers" --max-time 10 "$WEB_URL/login" || fail "web: /login failed"
+for header in "x-content-type-options: nosniff" "x-frame-options: deny" "referrer-policy: same-origin"; do
+  tr -d '\r' < "$WORK/headers" | grep -qix "$header" || fail "web: missing header '$header'"
+done
+! grep -qi "^x-powered-by:" "$WORK/headers" || fail "web: announces x-powered-by"
+ok "web sends security headers"
+
+case $(status_of "$WEB_URL/account/export") in
+  "307 "*/login) ok "web export needs a session" ;;
+  *) fail "web: /account/export without a session should redirect to /login" ;;
+esac
+
 if [ -z "${ORBIT_SMOKE_EMAIL:-}" ]; then
   ORBIT_SMOKE_EMAIL="smoke-$(date +%s)@example.com"
   ORBIT_SMOKE_PASSWORD="smoke-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
@@ -72,6 +96,7 @@ if [ -z "${ORBIT_SMOKE_EMAIL:-}" ]; then
         --email "$ORBIT_SMOKE_EMAIL" --name "Smoke Test" --password-stdin > /dev/null \
     || fail "could not create a throwaway owner; on an instance that already has one, set ORBIT_SMOKE_EMAIL and ORBIT_SMOKE_PASSWORD"
   ok "created throwaway owner"
+  FRESH_OWNER=1
 fi
 
 ORIGIN=https://attacker.example submit_form "$WEB_URL/login" "" \
@@ -90,16 +115,119 @@ SESSION=$(session_from_headers)
 [ -n "$SESSION" ] || fail "web: signing in did not set the $COOKIE cookie"
 grep -qi "^set-cookie: $COOKIE=.*httponly" "$WORK/headers" || fail "web: session cookie is not HttpOnly"
 ok "web sign-in sets an HttpOnly session cookie"
+grep -qi "^set-cookie: orbit_device=.*httponly" "$WORK/headers" \
+  || fail "web: signing in did not remember this browser (orbit_device cookie)"
+ok "web sign-in remembers the browser (ADR 0010)"
+case $WEB_URL in
+  https://*)
+    for name in "$COOKIE" orbit_device; do
+      grep -qi "^set-cookie: $name=.*; secure" "$WORK/headers" || fail "web: $name cookie is not Secure over HTTPS"
+    done
+    ok "web cookies are Secure over HTTPS"
+    ;;
+esac
 
 body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/") || fail "web: dashboard failed"
 case $body in *Online*) ok "web dashboard sees backend online" ;; *) fail "web: dashboard did not show the backend as Online" ;; esac
 case $body in *'data-testid="current-user"'*) ok "web shows the signed-in owner" ;; *) fail "web: no signed-in owner on the dashboard" ;; esac
-body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/shopping") || fail "web: /shopping failed"
-case $body in *"Coming in a later phase"*) ok "web module placeholder" ;; *) fail "web: /shopping placeholder missing" ;; esac
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/wishlist") || fail "web: /wishlist failed"
+case $body in *"Coming in a later phase"*) ok "web module placeholder" ;; *) fail "web: /wishlist placeholder missing" ;; esac
 
 [ "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SESSION" "$API_URL/auth/me")" = 200 ] \
   || fail "api: /auth/me rejected the web session token"
 ok "api accepts the session token"
+
+# Shopping, through the same forms a browser without JavaScript would use. The API (with
+# the session token) is the witness for what each form changed.
+api_get() { curl -sS --max-time 10 -H "Authorization: Bearer $SESSION" "$API_URL$1"; }
+
+[ "$(curl -sS -o /dev/null -w '%{http_code}' "$API_URL/shopping/items")" = 401 ] \
+  || fail "api: /shopping/items must refuse requests without a session"
+ok "api refuses shopping requests without a session"
+
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/shopping") || fail "web: /shopping failed"
+case $body in *'data-testid="shopping-list"'*) ok "web shopping page" ;; *) fail "web: /shopping did not show the list" ;; esac
+if [ -n "${FRESH_OWNER:-}" ]; then
+  case $body in *'data-testid="shopping-empty"'*) ok "web shopping empty state" ;; *) fail "web: a new owner's list should be empty" ;; esac
+fi
+
+ITEM="Smoke test milk $(date +%s)"
+FORM=add-item-form submit_form "$WEB_URL/shopping" "$SESSION" \
+  --form-string "name=$ITEM" --form-string "quantity=2 l" --form-string "notes="
+ID=$(api_get /shopping/items | tr '{' '\n' | grep -F "\"name\":\"$ITEM\"" | sed -n 's/^"id":"\([^"]*\)".*/\1/p')
+[ -n "$ID" ] || fail "web: adding an item through the form did not create it"
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/shopping") || fail "web: /shopping failed"
+case $body in *"$ITEM"*) ok "web adds a shopping item" ;; *) fail "web: the new item is not on the list" ;; esac
+
+curl -fsS -D "$WORK/headers" -o "$WORK/export.json" --max-time 30 -H "Cookie: $COOKIE=$SESSION" \
+  "$WEB_URL/account/export" || fail "web: /account/export failed"
+grep -q '"format":"orbit-export"' "$WORK/export.json" || fail "web: the export is not an Orbit export"
+grep -qF "$ITEM" "$WORK/export.json" || fail "web: the export does not hold the new item"
+! grep -qiE "password|argon2|$SESSION" "$WORK/export.json" || fail "web: the export holds a secret"
+tr -d '\r' < "$WORK/headers" | grep -qix "cache-control: no-store" || fail "web: the export may be cached"
+grep -qi '^content-disposition: attachment; filename="orbit-export-' "$WORK/headers" \
+  || fail "web: the export is not a file download"
+ok "web downloads the owner's export"
+
+FORM="toggle-item-$ID" submit_form "$WEB_URL/shopping" "$SESSION"
+case $(api_get "/shopping/items/$ID") in *'"checked":true'*) ok "web checks off an item" ;; *) fail "web: checking off did not stick" ;; esac
+
+FORM=edit-item-form submit_form "$WEB_URL/shopping/$ID/edit" "$SESSION" \
+  --form-string "name=$ITEM edited" --form-string "quantity=" --form-string "notes=Oat"
+grep -qi "^location: /shopping" "$WORK/headers" || fail "web: saving an edit did not return to /shopping"
+case $(api_get "/shopping/items/$ID") in
+  *"\"name\":\"$ITEM edited\",\"quantity\":null,\"notes\":\"Oat\""*) ok "web edits an item" ;;
+  *) fail "web: the edit was not saved" ;;
+esac
+
+FORM="delete-item-$ID" submit_form "$WEB_URL/shopping" "$SESSION"
+[ "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SESSION" "$API_URL/shopping/items/$ID")" = 404 ] \
+  || fail "web: deleting the item did not remove it"
+ok "web deletes an item"
+
+# Habits, through the same forms. "Today" is whatever the API says it is, in the
+# instance timezone (ADR 0008), so the script asks /time rather than its own clock.
+[ "$(curl -sS -o /dev/null -w '%{http_code}' "$API_URL/habits/habits")" = 401 ] \
+  || fail "api: /habits/habits must refuse requests without a session"
+ok "api refuses habit requests without a session"
+
+TODAY=$(api_get /time | sed -n 's/.*"today":"\([0-9-]*\)".*/\1/p')
+[ -n "$TODAY" ] || fail "api: /time did not report today's date"
+ok "api reports today as $TODAY"
+
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/habits") || fail "web: /habits failed"
+case $body in *'data-testid="habit-list"'*) ok "web habits page" ;; *) fail "web: /habits did not show the list" ;; esac
+
+HABIT="Smoke test reading $(date +%s)"
+FORM=add-habit-form submit_form "$WEB_URL/habits" "$SESSION" \
+  --form-string "name=$HABIT" --form-string "notes="
+HID=$(api_get /habits/habits | tr '{' '\n' | grep -F "\"name\":\"$HABIT\"" | sed -n 's/^"id":"\([^"]*\)".*/\1/p')
+[ -n "$HID" ] || fail "web: adding a habit through the form did not create it"
+ok "web adds a habit"
+
+FORM="check-in-$HID-$TODAY" submit_form "$WEB_URL/habits" "$SESSION"
+case $(api_get "/habits/habits/$HID") in *"\"check_ins\":[\"$TODAY\"]"*) ok "web checks off today" ;; *) fail "web: checking off today did not stick" ;; esac
+FORM="check-in-$HID-$TODAY" submit_form "$WEB_URL/habits" "$SESSION"
+case $(api_get "/habits/habits/$HID") in *'"check_ins":[]'*) ok "web un-checks today" ;; *) fail "web: un-checking today did not stick" ;; esac
+
+FORM="archive-habit-$HID" submit_form "$WEB_URL/habits/$HID/edit" "$SESSION"
+case $(api_get "/habits/habits/$HID") in *'"archived":true'*) ok "web archives a habit" ;; *) fail "web: archiving did not stick" ;; esac
+[ "$(curl -sS -o /dev/null -w '%{http_code}' -X PUT -H "Authorization: Bearer $SESSION" "$API_URL/habits/habits/$HID/check-ins/$TODAY")" = 409 ] \
+  || fail "api: an archived habit's check-ins must be read-only"
+ok "api keeps an archived habit read-only"
+
+FORM="restore-habit-$HID" submit_form "$WEB_URL/habits/archived" "$SESSION"
+case $(api_get "/habits/habits/$HID") in *'"archived":false'*) ok "web restores a habit" ;; *) fail "web: restoring did not stick" ;; esac
+[ "$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $SESSION" "$API_URL/habits/habits/$HID")" = 409 ] \
+  || fail "api: an active habit must be archived before it can be deleted"
+ok "api refuses to delete an active habit"
+
+FORM="archive-habit-$HID" submit_form "$WEB_URL/habits/$HID/edit" "$SESSION"
+FORM="delete-habit-$HID" submit_form "$WEB_URL/habits/archived" "$SESSION"
+grep -qi "^location: /habits/archived" "$WORK/headers" || fail "web: deleting a habit did not return to /habits/archived"
+[ "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SESSION" "$API_URL/habits/habits/$HID")" = 404 ] \
+  || fail "web: deleting the archived habit did not remove it"
+ok "web deletes an archived habit"
 
 submit_form "$WEB_URL/" "$SESSION"
 grep -qi "^location: /login" "$WORK/headers" || fail "web: signing out did not redirect to /login"

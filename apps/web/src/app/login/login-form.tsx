@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { ErrorMessage } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +13,7 @@ export function LoginForm() {
   const [state, action, pending] = useActionState(login, {});
 
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form action={action} className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -21,6 +22,7 @@ export function LoginForm() {
           type="email"
           autoComplete="username"
           defaultValue={state.email}
+          placeholder="you@example.com"
           required
         />
       </div>
@@ -34,12 +36,8 @@ export function LoginForm() {
           required
         />
       </div>
-      {state.error && (
-        <p role="alert" className="text-destructive text-sm">
-          {state.error}
-        </p>
-      )}
-      <Button type="submit" disabled={pending}>
+      {state.error && <ErrorMessage>{state.error}</ErrorMessage>}
+      <Button type="submit" disabled={pending} className="mt-1 h-11">
         {pending ? "Signing in…" : "Sign in"}
       </Button>
     </form>
