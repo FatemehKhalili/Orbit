@@ -107,14 +107,14 @@ CI runs on pushes to `main` and on pull requests (`.github/workflows/ci.yml`):
 | Compose smoke test  | Starts db, api and web, runs `scripts/smoke-test.sh`, then `alembic check` |
 | Production stack    | Only the web app published (on 127.0.0.1); starts `compose.production.yml`, smoke test, API docs off, `alembic check`, then the smoke test again over HTTPS through the Caddy profile |
 | Backup and restore  | Seeds data, backs up, deletes the volume, restores, and proves fingerprints, export and password identical; refusals for a running app, a damaged file and a non-empty database |
-| Upgrade from v0.5.0-phase5 | Upgrades a seeded v0.5.0 install in place, rolls back by restoring its backup into v0.5.0, and moves the backup into a fresh production stack |
+| Upgrade from v0.6.0-phase6 | Upgrades a seeded v0.6.0 production install in place, proves the data and sessions unchanged, runs the smoke test on it, and rolls back by restoring its backup into v0.6.0 |
 
 Coverage: API health, configuration, database sessions, migrations, sign-in, sessions, the
 one-owner rule, the admin CLI, the instance timezone, Shopping and Habits including
 ownership with a second user, sign-in throttling, the export and production defaults
 (298 tests); web configuration, the API client, the session and device cookies, the shared
 form helpers, login, Shopping and Habits form logic, the seven-day strip, route
-protection, the export download, client addresses and security headers (199 tests);
+protection, the export download, client addresses and security headers and the Dashboard's check-off cards (220 tests);
 and the end-to-end smoke test.
 
 Dependabot (`.github/dependabot.yml`) opens weekly update PRs for the API, the web app,

@@ -15,6 +15,7 @@ export function isActiveModule(pathname: string, href: string): boolean {
 }
 
 export const LOGIN_PATH = "/login";
+export const DASHBOARD_PATH = "/";
 
 // Reachable without signing in. Everything else needs a session.
 const PUBLIC_PATHS = new Set([LOGIN_PATH, "/api/health"]);

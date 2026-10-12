@@ -16,7 +16,9 @@ Open http://localhost:3000 and sign in with the owner account (create it with th
 `create-owner` command, see [apps/api/README.md](../api/README.md)). The dashboard greets the
 owner with today's date and shows how many habits are done today, how many shopping items
 are left to buy, a **Backend** card that reports the API's `/health/ready` result, a
-seven-day habit chart and the module orbit. **Shopping** (`/shopping`) is the owner's shopping list.
+seven-day habit chart and the module orbit. Its **Today's habits** and **To buy** cards
+check off today's habits and the first five unchecked items with the Habits and Shopping
+Server Actions. **Shopping** (`/shopping`) is the owner's shopping list.
 **Habits** (`/habits`) lists active habits, each with a strip of the last seven days to
 check off; `/habits/[id]/edit` edits, archives or restores one, and `/habits/archived` lists
 archived habits, which can be restored or deleted for good. The other modules have

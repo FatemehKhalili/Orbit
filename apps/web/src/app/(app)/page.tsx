@@ -5,24 +5,26 @@ import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { ArrowForwardIcon, BasketIcon, SproutIcon } from "@/components/icons";
-import { SeedlingIllustration } from "@/components/illustrations";
+import { BasketIllustration, SeedlingIllustration } from "@/components/illustrations";
 import { MODULE_LOOK, TONES, type Tone } from "@/components/modules";
 import { Badge, BadgeDot } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { checkApiHealth, type ApiHealth } from "@/lib/api-health";
 import { getSessionToken, requireUser } from "@/lib/auth";
 import {
-  allDoneToday,
-  countDoneToday,
-  formatLongDate,
-  weekActivity,
-  type DayActivity,
-} from "@/lib/habits";
-import { getTime, listHabits } from "@/lib/habits-api";
+  moreToBuyLabel,
+  todayHabits,
+  toBuyPreview,
+  type TodayHabits,
+  type ToBuyPreview,
+} from "@/lib/dashboard";
+import { allDoneToday, formatLongDate, weekActivity, type DayActivity } from "@/lib/habits";
+import { getTime, listHabits, type Day } from "@/lib/habits-api";
 import { LOGIN_PATH, MODULES } from "@/lib/routes";
-import { countToBuy } from "@/lib/shopping";
 import { listShoppingItems } from "@/lib/shopping-api";
 import { cn } from "@/lib/utils";
+
+import { TodayHabitRow, ToBuyRow } from "./dashboard-rows";
 
 const API_STATUS: Record<
   ApiHealth["state"],
@@ -61,8 +63,12 @@ export default async function DashboardPage() {
   const habitList = habits?.ok ? habits.data : null;
   const itemList = items?.ok ? items.data : null;
 
-  const doneToday = today && habitList ? countDoneToday(habitList, today) : 0;
-  const toBuy = itemList ? countToBuy(itemList) : 0;
+  // One view of each module's data feeds both the summary cards and the check-off cards,
+  // so their numbers always agree.
+  const habitsToday = today && habitList ? todayHabits(habitList, today) : null;
+  const shopping = itemList ? toBuyPreview(itemList) : null;
+  const doneToday = habitsToday?.done ?? 0;
+  const toBuy = shopping?.toBuy ?? 0;
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8 lg:px-8 lg:py-10">
@@ -136,6 +142,11 @@ export default async function DashboardPage() {
         </Card>
       </section>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <TodayHabitsCard habits={habitsToday} today={today} />
+        <ToBuyCard shopping={shopping} />
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
         <Card>
           <CardHeader>
@@ -180,6 +191,123 @@ export default async function DashboardPage() {
         </Card>
       </div>
     </main>
+  );
+}
+
+/** A card title with the module's icon in its tone. */
+function ToneTitle({ tone, icon, children }: { tone: Tone; icon: ReactNode; children: ReactNode }) {
+  return (
+    <CardTitle className="flex items-center gap-2.5">
+      <span
+        aria-hidden
+        className={cn(
+          "flex size-8 items-center justify-center rounded-xl text-base",
+          TONES[tone].soft,
+          TONES[tone].ink,
+        )}
+      >
+        {icon}
+      </span>
+      {children}
+    </CardTitle>
+  );
+}
+
+const MODULE_LINK = "text-primary font-semibold underline-offset-4 hover:underline";
+
+/** Check today's habits off without leaving the Dashboard. */
+function TodayHabitsCard({ habits, today }: { habits: TodayHabits | null; today: Day | null }) {
+  return (
+    <Card data-testid="dashboard-habits">
+      <CardHeader>
+        <ToneTitle tone="mint" icon={<SproutIcon />}>
+          Today&apos;s habits
+        </ToneTitle>
+        <CardDescription>
+          {!habits
+            ? "Your habits could not be loaded right now."
+            : habits.total === 0
+              ? "Nothing to check off yet."
+              : habits.done === habits.total
+                ? "All done today. Lovely work!"
+                : "Tap a habit when it is done."}
+        </CardDescription>
+      </CardHeader>
+      {habits && today && (
+        <CardContent>
+          {habits.total === 0 ? (
+            <EmptyState
+              tone="mint"
+              illustration={<SeedlingIllustration />}
+              title="No habits yet"
+              className="py-6"
+            >
+              <Link href="/habits" className={MODULE_LINK}>
+                Start a habit
+              </Link>
+            </EmptyState>
+          ) : (
+            <ul className="-mx-3 flex flex-col gap-0.5" aria-label="Today's habits">
+              {habits.rows.map((row) => (
+                <TodayHabitRow key={row.habit.id} row={row} today={today} />
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+/** Check the first few unchecked shopping items off without leaving the Dashboard. */
+function ToBuyCard({ shopping }: { shopping: ToBuyPreview | null }) {
+  return (
+    <Card data-testid="dashboard-to-buy">
+      <CardHeader>
+        <ToneTitle tone="peach" icon={<BasketIcon />}>
+          To buy
+        </ToneTitle>
+        <CardDescription>
+          {!shopping
+            ? "Your shopping list could not be loaded right now."
+            : shopping.toBuy === 0
+              ? "Nothing left to buy."
+              : "Tap an item once it is in the basket."}
+        </CardDescription>
+      </CardHeader>
+      {shopping && (
+        <CardContent className="flex flex-col gap-3">
+          {shopping.toBuy === 0 ? (
+            <EmptyState
+              tone="peach"
+              illustration={<BasketIllustration />}
+              title="All caught up"
+              className="py-6"
+            >
+              <Link href="/shopping" className={MODULE_LINK}>
+                Open the shopping list
+              </Link>
+            </EmptyState>
+          ) : (
+            <ul className="-mx-3 flex flex-col gap-0.5" aria-label="To buy">
+              {shopping.shown.map((item) => (
+                <ToBuyRow key={item.id} item={item} />
+              ))}
+            </ul>
+          )}
+          {shopping.remaining > 0 && (
+            <Link
+              href="/shopping"
+              className={cn(MODULE_LINK, "inline-flex items-center gap-1 self-start text-sm")}
+              data-testid="dashboard-more-items"
+            >
+              {moreToBuyLabel(shopping.remaining)}
+              <ArrowForwardIcon className="size-4" />
+            </Link>
+          )}
+        </CardContent>
+      )}
+    </Card>
   );
 }
 

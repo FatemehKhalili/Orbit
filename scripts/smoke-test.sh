@@ -159,6 +159,26 @@ ID=$(api_get /shopping/items | tr '{' '\n' | grep -F "\"name\":\"$ITEM\"" | sed 
 body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/shopping") || fail "web: /shopping failed"
 case $body in *"$ITEM"*) ok "web adds a shopping item" ;; *) fail "web: the new item is not on the list" ;; esac
 
+# The Dashboard lists the first five unchecked items. On a fresh owner the new item is
+# one of them; an existing owner may already have five, and then this check is skipped.
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/") || fail "web: dashboard failed"
+case $body in
+  *"data-testid=\"dashboard-toggle-item-$ID\""*)
+    FORM="dashboard-toggle-item-$ID" submit_form "$WEB_URL/" "$SESSION"
+    case $(api_get "/shopping/items/$ID") in *'"checked":true'*) ;; *) fail "web: checking off from the dashboard did not stick" ;; esac
+    body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/") || fail "web: dashboard failed"
+    case $body in *"data-item-id=\"$ID\""*) fail "web: a bought item is still on the dashboard after a reload" ;; esac
+    ok "web checks off an item from the dashboard, and it stays off after a reload"
+    curl -fsS -o /dev/null --max-time 10 -X PATCH -H "Authorization: Bearer $SESSION" \
+      -H "Content-Type: application/json" -d '{"checked":false}' "$API_URL/shopping/items/$ID" \
+      || fail "api: could not un-check the smoke test item"
+    ;;
+  *)
+    [ -z "${FRESH_OWNER:-}" ] || fail "web: the new item is not on the dashboard"
+    ok "web dashboard check-off skipped (five other items come first)"
+    ;;
+esac
+
 curl -fsS -D "$WORK/headers" -o "$WORK/export.json" --max-time 30 -H "Cookie: $COOKIE=$SESSION" \
   "$WEB_URL/account/export" || fail "web: /account/export failed"
 grep -q '"format":"orbit-export"' "$WORK/export.json" || fail "web: the export is not an Orbit export"
@@ -205,6 +225,18 @@ HID=$(api_get /habits/habits | tr '{' '\n' | grep -F "\"name\":\"$HABIT\"" | sed
 [ -n "$HID" ] || fail "web: adding a habit through the form did not create it"
 ok "web adds a habit"
 
+# Today from the Dashboard: every active habit is listed there.
+FORM="dashboard-check-in-$HID" submit_form "$WEB_URL/" "$SESSION"
+case $(api_get "/habits/habits/$HID") in *"\"check_ins\":[\"$TODAY\"]"*) ;; *) fail "web: checking off today from the dashboard did not stick" ;; esac
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/") || fail "web: dashboard failed"
+case $body in *"data-habit-id=\"$HID\" data-done=\"true\""*) ;; *) fail "web: the dashboard does not show the habit done after a reload" ;; esac
+if [ -n "${FRESH_OWNER:-}" ]; then
+  case $body in *"1 of 1"*) ;; *) fail "web: the dashboard's habit count did not update" ;; esac
+fi
+ok "web checks off today from the dashboard, and it stays done after a reload"
+FORM="dashboard-check-in-$HID" submit_form "$WEB_URL/" "$SESSION"
+case $(api_get "/habits/habits/$HID") in *'"check_ins":[]'*) ok "web un-checks today from the dashboard" ;; *) fail "web: un-checking from the dashboard did not stick" ;; esac
+
 FORM="check-in-$HID-$TODAY" submit_form "$WEB_URL/habits" "$SESSION"
 case $(api_get "/habits/habits/$HID") in *"\"check_ins\":[\"$TODAY\"]"*) ok "web checks off today" ;; *) fail "web: checking off today did not stick" ;; esac
 FORM="check-in-$HID-$TODAY" submit_form "$WEB_URL/habits" "$SESSION"
@@ -229,7 +261,7 @@ grep -qi "^location: /habits/archived" "$WORK/headers" || fail "web: deleting a 
   || fail "web: deleting the archived habit did not remove it"
 ok "web deletes an archived habit"
 
-submit_form "$WEB_URL/" "$SESSION"
+FORM=sign-out-form submit_form "$WEB_URL/" "$SESSION"
 grep -qi "^location: /login" "$WORK/headers" || fail "web: signing out did not redirect to /login"
 ok "web sign-out"
 
