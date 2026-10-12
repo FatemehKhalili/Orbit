@@ -22,7 +22,7 @@ differ; regenerate it with:
   "format": "orbit-export",
   "format_version": "1.0",
   "exported_at": "2026-10-11T17:00:00.123456Z",
-  "orbit_version": "0.6.0",
+  "orbit_version": "0.7.0",
   "timezone": "Europe/Berlin",
   "account": { "email": "you@example.com", "display_name": "You", "created_at": "..." },
   "shopping": {

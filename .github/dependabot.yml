@@ -17,6 +17,13 @@ updates:
     groups:
       web-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Major versions wait until the linting stack supports them: typescript-eslint for
+      # TypeScript, eslint-config-next for ESLint. Minor and patch updates still arrive.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
