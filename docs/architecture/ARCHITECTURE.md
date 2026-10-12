@@ -23,8 +23,8 @@ The web app reaches the API from its server, not from the browser
 apps/
   web/                Next.js app (App Router, src/ layout)
     src/app/          Routes: login/ (sign-in form and Server Action), (app)/ (signed-in
-                      layout, dashboard, shopping/ and habits/ with their Server Actions,
-                      one placeholder page per other module), account/export (the data
+                      layout, dashboard, shopping/, habits/ and calendar/ with their Server
+                      Actions, one placeholder page per other module), account/export (the data
                       download), api/health
     src/proxy.ts      Sends requests without a session cookie to /login
     src/components/   Shared pieces: icons and illustrations (inline SVG), logo, page header,
@@ -33,26 +33,31 @@ apps/
     src/lib/          config.ts (env parsing), api-client.ts (calls the API), api-health.ts,
                       auth-api.ts, auth.ts and session.ts (session cookie), forms.ts and
                       form-actions.ts (shared form helpers), shopping-api.ts and shopping.ts,
-                      habits-api.ts and habits.ts (each module's calls and form logic), routes.ts,
+                      habits-api.ts and habits.ts, calendar-api.ts and calendar.ts (each
+                      module's calls and form logic), time-api.ts (today from the API) and
+                      days.ts (calendar-date maths in UTC), routes.ts,
                       client-ip.ts (trusted-proxy address), export-download.ts,
                       security-headers.ts (sent on every page by next.config.ts)
     Dockerfile        targets: dev, runtime (default)
   api/                FastAPI app
     app/main.py       create_app() factory
     app/config.py     Settings from environment variables (pydantic-settings)
-    app/clock.py      Today's date in the instance timezone (TodayDep)
+    app/clock.py      Today's date and the instance timezone (TodayDep, TimezoneDep)
+    app/calendar/     local_time.py (local days and times to instants, the day rule, DST)
+                      and service.py, the Calendar's one write path (ADR 0011)
     app/database.py   SQLAlchemy engine, session factory, get_session dependency
     app/models/       ORM models: Base (naming convention), mixins, User, AuthSession,
-                      LoginThrottle, LoginDevice, ShoppingItem, Habit, HabitCheckIn
+                      LoginThrottle, LoginDevice, ShoppingItem, Habit, HabitCheckIn,
+                      CalendarEvent
     app/auth/         Passwords, session tokens, owner/session service, sign-in throttle
                       (throttle.py), CurrentUserDep
     app/api/          Routers, one module per area (health.py, auth.py, time.py, shopping.py,
-                      habits.py, account.py for the export); text.py holds the shared text field types
+                      habits.py, calendar.py, account.py for the export); text.py holds the shared text field types
     app/cli.py        Admin commands: create-owner, set-password, clear-login-blocks,
                       purge-expired
     alembic.ini       Alembic config (no database URL; env.py reads Settings)
     migrations/       Alembic environment and revisions (baseline, users and sessions,
-                      shopping items, habits, login throttles and devices)
+                      shopping items, habits, login throttles and devices, calendar events)
     tests/            pytest
     uv.lock           Locked Python dependencies
     Dockerfile        targets: dev, runtime (default)
@@ -128,6 +133,7 @@ Browser ──cookie──▶ web: proxy (cookie present?) ─▶ layout/page �
 | `sessions` | API database | SHA-256 hash of each token, expiry; deleting the row revokes it |
 | `shopping_items` | API database | Shopping items, each with an `owner_id` (cascade on delete) |
 | `habits`, `habit_check_ins` | API database | Habits (`archived_at` null while active) and one row per habit per day done; a composite key keeps a check-in's owner equal to its habit's, and deleting a habit deletes its check-ins |
+| `calendar_events` | API database | All-day events (`start_day`, `end_day`, inclusive) or timed ones (`starts_at`, `ends_at`, instants), never both, enforced by `ck_calendar_events_shape`; `ck_calendar_events_end_not_before_start`; cascade on the owner ([ADR 0011](../decisions/0011-calendar-events-and-time.md)) |
 | `login_throttles` | API database | Failure counts and blocks per bucket, keyed by hashes only ([ADR 0010](../decisions/0010-sign-in-throttling-and-known-devices.md)) |
 | `login_devices` | API database | SHA-256 hash of each known-browser token, its user and expiry |
 | `POST /auth/login` | API | Email + password (+ device token, client address) → token, expiry and the device token (new or renewed); same 401 for every wrong password, 429 with `Retry-After` while throttled |
@@ -155,10 +161,13 @@ Browser ──cookie──▶ web: proxy (cookie present?) ─▶ layout/page �
   shows the module navigation (a sidebar on wide screens, a scrolling row on phones) and a
   sign-out button; the dashboard renders on each request and shows a greeting with today's
   date, summary cards for today's habits and the shopping list, the API's readiness,
-  cards to check off today's habits and the first five unchecked items (with the Habits
-  and Shopping Server Actions, which refresh the Dashboard too), a seven-day habit chart
-  and the module orbit; Shopping has its list and an edit page; Habits has
-  its list with a seven-day check-off strip, an edit page and an archived list; the other
+  a full-width "Today's plans" card (up to five of today's events, then "and N more
+  today"), cards to check off today's habits and the first five unchecked items (with the
+  Habits and Shopping Server Actions, which refresh the Dashboard too), a seven-day habit
+  chart and the module orbit; Shopping has its list and an edit page; Habits has
+  its list with a seven-day check-off strip, an edit page and an archived list; Calendar
+  has a seven-day agenda from today (`?from=` moves it by seven days), an add form, an
+  edit page, and a confirmation page that is the only way to delete an event; the other
   modules have placeholder pages. Dates come from the API (`GET /time`) and are formatted
   in UTC, so the web server's own timezone never shifts them.
 - Server code calls the API through `src/lib/api-client.ts`, which adds the session token
@@ -234,11 +243,11 @@ pre-upgrade backup into the previous release, never `alembic downgrade`.
 | Level        | Where                         | Tooling           |
 | ------------ | ----------------------------- | ----------------- |
 | API unit     | `apps/api/tests`              | pytest, TestClient |
-| API + DB     | `apps/api/tests` (`integration` marker, needs `TEST_DATABASE_URL`): readiness, migrations up/down, `alembic check`, sign-in, sessions, the one-owner constraint (including concurrent inserts), admin CLI, Shopping and Habits CRUD and ownership with a second user (`two_users_client`, ADR 0007), the check-in window across a day boundary, races with a concurrent delete | pytest |
+| API + DB     | `apps/api/tests` (`integration` marker, needs `TEST_DATABASE_URL`): readiness, migrations up/down, `alembic check`, sign-in, sessions, the one-owner constraint (including concurrent inserts), admin CLI, Shopping, Habits and Calendar CRUD and ownership with a second user (`two_users_client`, ADR 0007), the check-in window across a day boundary, calendar days and times across DST changes and timezones, the additive calendar migration, races with a concurrent delete | pytest |
 | Web unit     | `apps/web/src/**/*.test.ts`   | Vitest            |
 | Images       | `scripts/check-image.sh`      | Builds and starts each `runtime` image in CI |
-| End to end   | `scripts/smoke-test.sh`: health, security headers, then sign in (session and device cookies), add, check, edit and delete a shopping item and check one off from the Dashboard, download the export, add a habit, check and un-check today on the Habits page and on the Dashboard, archive, restore and delete it, and sign out, all through the web forms | curl, against Compose (development, production and HTTPS) |
-| Operations   | CI jobs "Backup and restore" and "Upgrade from v0.6.0-phase6": data fingerprints (`scripts/db-fingerprint.sh`), export and sign-in identical across backup, volume loss and restore; in-place upgrade of the production stack, a smoke test on the upgraded data, and rollback by restore | Compose, on throwaway volumes |
+| End to end   | `scripts/smoke-test.sh`: health, security headers, then sign in (session and device cookies), add, check, edit and delete a shopping item and check one off from the Dashboard, download the export, add a habit, check and un-check today on the Habits page and on the Dashboard, archive, restore and delete it, add, edit and delete (through its confirmation page) a calendar event and see it in today's plans, and sign out, all through the web forms | curl, against Compose (development, production and HTTPS) |
+| Operations   | CI jobs "Backup and restore" and "Upgrade from v0.7.0-phase7": data fingerprints (`scripts/db-fingerprint.sh`), export and sign-in identical across backup, volume loss and restore; in-place upgrade of the production stack (existing tables compared exactly, the new table and migration version checked on their own), a smoke test on the upgraded data, rollback by restore, and the old backup restored into a fresh install of the new code | Compose, on throwaway volumes |
 
 ## Open questions
 

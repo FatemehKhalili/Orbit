@@ -133,6 +133,27 @@ today and the six days before can be changed (422 otherwise). An archived habit 
 read-only: changing its name, notes or check-ins is a 409 until it is unarchived. Its
 history is kept. Ownership works as in Shopping.
 
+## Calendar
+
+| Endpoint                          | Meaning                                                   |
+| --------------------------------- | --------------------------------------------------------- |
+| `GET /calendar/events?from=&to=`  | Events on any local day from `from` to `to` (inclusive, at most 62 days): all-day first, then by start |
+| `POST /calendar/events`           | `{"title", "notes"?, "when"}` → the event, 201            |
+| `GET /calendar/events/{id}`       | One event, or 404                                         |
+| `PATCH /calendar/events/{id}`     | Any of `title`, `notes`, `when`; `null` clears notes; `when` replaces the time whole |
+| `DELETE /calendar/events/{id}`    | 204, or 404                                               |
+
+`when` is `{"all_day": true, "start_day", "end_day"?}` (inclusive days) or
+`{"all_day": false, "start_day", "start_time", "end_day"?, "end_time"?}` with local
+`"HH:MM"` times in `ORBIT_TIMEZONE`; without an end time a timed event is a point in time.
+Responses carry the local days and times, the stored instants (`starts_at`, `ends_at`), and
+`first_day` and `last_day`: the days the event is on. An event ending exactly at midnight
+is not on the next day. A time skipped when the clocks go forward is a 422; a repeated
+time takes its first occurrence. An event lasts at most 366 days. Every write goes through
+`app/calendar/service.py`
+([ADR 0011](../../docs/decisions/0011-calendar-events-and-time.md)). Ownership works as in
+Shopping.
+
 ## Database migrations
 
 Alembic, configured in `alembic.ini` and `migrations/`. It reads `DATABASE_URL` the same
