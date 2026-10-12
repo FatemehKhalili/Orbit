@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 
 import { FormMessage } from "@/components/form-message";
+import { ArchiveIcon, RestoreIcon, TrashIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { IDLE } from "@/lib/habits";
 import type { Habit } from "@/lib/habits-api";
@@ -31,6 +32,7 @@ export function ArchiveButton({ habit }: { habit: Pick<Habit, "id" | "name" | "a
         disabled={pending}
         aria-label={`${verb} “${habit.name}”`}
       >
+        {habit.archived ? <RestoreIcon /> : <ArchiveIcon />}
         {pending ? working : verb}
       </Button>
       <FormMessage state={state} />
@@ -51,12 +53,12 @@ export function DeleteButton({ habit }: { habit: Pick<Habit, "id" | "name"> }) {
       <input type="hidden" name="id" value={habit.id} />
       <Button
         type="submit"
-        variant="ghost"
+        variant="destructive"
         size="sm"
         disabled={pending}
         aria-label={`Delete “${habit.name}” and its history for good`}
-        className="text-destructive"
       >
+        <TrashIcon />
         {pending ? "Deleting…" : "Delete for good"}
       </Button>
       <FormMessage state={state} />

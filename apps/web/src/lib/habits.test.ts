@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ApiError } from "./api-client";
 import {
   addDays,
+  allDoneToday,
   buildWeek,
+  countDoneToday,
   formatLongDate,
   HABIT_ERRORS,
   performAddHabit,
@@ -14,6 +16,7 @@ import {
   readHabitFields,
   summarize,
   validateHabit,
+  weekActivity,
 } from "./habits";
 import type { Habit } from "./habits-api";
 
@@ -346,5 +349,59 @@ describe("dates and the seven-day strip", () => {
         "2026-10-11",
       ),
     ).toBe("1 of 3 done today");
+  });
+});
+
+describe("weekActivity", () => {
+  it("counts the habits done on each of the last seven days, ending today", () => {
+    const habits = [
+      { checkIns: ["2026-10-05", "2026-10-11"] },
+      { checkIns: ["2026-10-11"] },
+      { checkIns: [] },
+    ];
+    const week = weekActivity(habits, "2026-10-11");
+
+    expect(week.map((day) => [day.day, day.done])).toEqual([
+      ["2026-10-05", 1],
+      ["2026-10-06", 0],
+      ["2026-10-07", 0],
+      ["2026-10-08", 0],
+      ["2026-10-09", 0],
+      ["2026-10-10", 0],
+      ["2026-10-11", 2],
+    ]);
+    expect(week.at(-1)).toMatchObject({ weekday: "Sun", isToday: true });
+  });
+});
+
+describe("countDoneToday and allDoneToday", () => {
+  const today = "2026-10-11";
+
+  it("count only check-ins on today", () => {
+    const habits = [{ checkIns: ["2026-10-10", today] }, { checkIns: ["2026-10-10"] }];
+    expect(countDoneToday(habits, today)).toBe(1);
+    expect(allDoneToday(habits, today)).toBe(false);
+  });
+
+  it("are all done when every habit was checked off today", () => {
+    expect(allDoneToday([{ checkIns: [today] }, { checkIns: [today] }], today)).toBe(true);
+  });
+
+  it("are never all done without habits", () => {
+    expect(countDoneToday([], today)).toBe(0);
+    expect(allDoneToday([], today)).toBe(false);
+  });
+});
+
+describe("weekActivity edge cases", () => {
+  it("is seven empty days without habits", () => {
+    const week = weekActivity([], "2026-10-11");
+    expect(week).toHaveLength(7);
+    expect(week.every((day) => day.done === 0)).toBe(true);
+  });
+
+  it("ignores check-ins outside the window", () => {
+    const week = weekActivity([{ checkIns: ["2026-10-04", "2026-10-12"] }], "2026-10-11");
+    expect(week.every((day) => day.done === 0)).toBe(true);
   });
 });

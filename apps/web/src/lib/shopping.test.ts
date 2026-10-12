@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ApiError } from "./api-client";
 import {
+  countToBuy,
   performAddItem,
   performDeleteItem,
   performEditItem,
@@ -221,5 +222,15 @@ describe("summarize", () => {
     [[{ checked: false }, { checked: true }, { checked: true }], "1 to buy · 2 checked"],
   ])("%j → %s", (items, text) => {
     expect(summarize(items)).toBe(text);
+  });
+});
+
+describe("countToBuy", () => {
+  it.each([
+    [[], 0],
+    [[{ checked: false }, { checked: true }, { checked: false }], 2],
+    [[{ checked: true }], 0],
+  ])("%j has %i to buy", (items, count) => {
+    expect(countToBuy(items)).toBe(count);
   });
 });

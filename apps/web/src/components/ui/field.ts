@@ -1,0 +1,3 @@
+/** The shared look of text inputs and text areas: a soft well that brightens on focus. */
+export const fieldClasses =
+  "w-full min-w-0 rounded-xl border border-input bg-sunken/60 px-3.5 text-base shadow-[inset_0_1px_2px_hsl(var(--shadow-color)/0.05)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-muted-foreground/80 hover:border-border-strong focus-visible:border-ring focus-visible:bg-card focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-55 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm";

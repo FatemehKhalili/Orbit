@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 
 import { FormMessage } from "@/components/form-message";
+import { PlusIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { IDLE } from "@/lib/shopping";
 
@@ -19,6 +20,7 @@ export function AddItemForm() {
       <ItemFields idPrefix="new-item" values={values} />
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending}>
+          <PlusIcon />
           {pending ? "Adding…" : "Add item"}
         </Button>
         <FormMessage state={state} />

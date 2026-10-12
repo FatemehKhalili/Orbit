@@ -67,6 +67,8 @@ def test_migrations_upgrade_downgrade_and_match_the_models(database_url_from_env
             "shopping_items",
             "habits",
             "habit_check_ins",
+            "login_throttles",
+            "login_devices",
         } <= set(inspector.get_table_names())
         assert {c["name"] for c in inspector.get_unique_constraints("users")} == {
             "uq_users_email",
@@ -99,6 +101,13 @@ def test_migrations_upgrade_downgrade_and_match_the_models(database_url_from_env
         assert {c["name"] for c in inspector.get_unique_constraints("habit_check_ins")} == {
             "uq_habit_check_ins_habit_id_day"
         }
+
+        assert [c["name"] for c in inspector.get_unique_constraints("login_devices")] == [
+            "uq_login_devices_token_hash"
+        ]
+        [device_fk] = inspector.get_foreign_keys("login_devices")
+        assert device_fk["name"] == "fk_login_devices_user_id_users"
+        assert device_fk["options"]["ondelete"] == "CASCADE"
 
         # Models and migrations agree: autogenerate would produce no changes.
         command.check(config)

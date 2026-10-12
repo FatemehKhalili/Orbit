@@ -2,14 +2,13 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+import { fieldClasses } from "./field";
+
 function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea
       data-slot="textarea"
-      className={cn(
-        "flex min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive md:text-sm",
-        className,
-      )}
+      className={cn(fieldClasses, "flex min-h-20 py-2.5 leading-relaxed", className)}
       {...props}
     />
   );

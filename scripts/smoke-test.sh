@@ -4,6 +4,10 @@
 # and using the Shopping list and Habits through their forms in between.
 # Usage: ./scripts/smoke-test.sh   (after `docker compose up`)
 #
+# For the production stack, point Compose at it (COMPOSE_FILE=compose.production.yml plus
+# an override that publishes the API, as CI does). With WEB_URL on https://, the cookies
+# must also be Secure.
+#
 # Signing in needs an owner. With ORBIT_SMOKE_EMAIL and ORBIT_SMOKE_PASSWORD set, the
 # script uses that account. Otherwise it creates a throwaway owner through Docker Compose,
 # which only works on an instance that has no owner yet (a fresh database, as in CI).
@@ -72,6 +76,18 @@ case $(status_of "$WEB_URL/") in
 esac
 check "web login page"     "$WEB_URL/login"        'Sign in'
 
+curl -fsS -o /dev/null -D "$WORK/headers" --max-time 10 "$WEB_URL/login" || fail "web: /login failed"
+for header in "x-content-type-options: nosniff" "x-frame-options: deny" "referrer-policy: same-origin"; do
+  tr -d '\r' < "$WORK/headers" | grep -qix "$header" || fail "web: missing header '$header'"
+done
+! grep -qi "^x-powered-by:" "$WORK/headers" || fail "web: announces x-powered-by"
+ok "web sends security headers"
+
+case $(status_of "$WEB_URL/account/export") in
+  "307 "*/login) ok "web export needs a session" ;;
+  *) fail "web: /account/export without a session should redirect to /login" ;;
+esac
+
 if [ -z "${ORBIT_SMOKE_EMAIL:-}" ]; then
   ORBIT_SMOKE_EMAIL="smoke-$(date +%s)@example.com"
   ORBIT_SMOKE_PASSWORD="smoke-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
@@ -99,6 +115,17 @@ SESSION=$(session_from_headers)
 [ -n "$SESSION" ] || fail "web: signing in did not set the $COOKIE cookie"
 grep -qi "^set-cookie: $COOKIE=.*httponly" "$WORK/headers" || fail "web: session cookie is not HttpOnly"
 ok "web sign-in sets an HttpOnly session cookie"
+grep -qi "^set-cookie: orbit_device=.*httponly" "$WORK/headers" \
+  || fail "web: signing in did not remember this browser (orbit_device cookie)"
+ok "web sign-in remembers the browser (ADR 0010)"
+case $WEB_URL in
+  https://*)
+    for name in "$COOKIE" orbit_device; do
+      grep -qi "^set-cookie: $name=.*; secure" "$WORK/headers" || fail "web: $name cookie is not Secure over HTTPS"
+    done
+    ok "web cookies are Secure over HTTPS"
+    ;;
+esac
 
 body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/") || fail "web: dashboard failed"
 case $body in *Online*) ok "web dashboard sees backend online" ;; *) fail "web: dashboard did not show the backend as Online" ;; esac
@@ -131,6 +158,16 @@ ID=$(api_get /shopping/items | tr '{' '\n' | grep -F "\"name\":\"$ITEM\"" | sed 
 [ -n "$ID" ] || fail "web: adding an item through the form did not create it"
 body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/shopping") || fail "web: /shopping failed"
 case $body in *"$ITEM"*) ok "web adds a shopping item" ;; *) fail "web: the new item is not on the list" ;; esac
+
+curl -fsS -D "$WORK/headers" -o "$WORK/export.json" --max-time 30 -H "Cookie: $COOKIE=$SESSION" \
+  "$WEB_URL/account/export" || fail "web: /account/export failed"
+grep -q '"format":"orbit-export"' "$WORK/export.json" || fail "web: the export is not an Orbit export"
+grep -qF "$ITEM" "$WORK/export.json" || fail "web: the export does not hold the new item"
+! grep -qiE "password|argon2|$SESSION" "$WORK/export.json" || fail "web: the export holds a secret"
+tr -d '\r' < "$WORK/headers" | grep -qix "cache-control: no-store" || fail "web: the export may be cached"
+grep -qi '^content-disposition: attachment; filename="orbit-export-' "$WORK/headers" \
+  || fail "web: the export is not a file download"
+ok "web downloads the owner's export"
 
 FORM="toggle-item-$ID" submit_form "$WEB_URL/shopping" "$SESSION"
 case $(api_get "/shopping/items/$ID") in *'"checked":true'*) ok "web checks off an item" ;; *) fail "web: checking off did not stick" ;; esac

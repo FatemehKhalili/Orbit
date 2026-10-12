@@ -1,0 +1,21 @@
+# HTTPS in front of Orbit for the opt-in `https` profile of compose.production.yml
+# (docs/deployment/README.md). Caddy replaces any X-Forwarded-For a browser sends with the
+# address it sees, so the web app can trust the header (ORBIT_TRUSTED_PROXY=true).
+{
+	# Nothing needs Caddy's admin API.
+	admin off
+}
+
+# ORBIT_TLS=internal: certificates from Caddy's own local certificate authority, for a
+# home network (trust its root certificate on your devices once). ORBIT_TLS=acme: a public
+# certificate, when ORBIT_DOMAIN points at this machine from the internet.
+(tls-internal) {
+	tls internal
+}
+(tls-acme) {
+}
+
+{$ORBIT_DOMAIN} {
+	import tls-{$ORBIT_TLS}
+	reverse_proxy web:3000
+}

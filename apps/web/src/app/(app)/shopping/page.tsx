@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
+import { BasketIcon } from "@/components/icons";
+import { BasketIllustration } from "@/components/illustrations";
+import { PageHeader } from "@/components/page-header";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { UnavailableCard } from "@/components/unavailable-card";
 import { getSessionToken, requireUser } from "@/lib/auth";
 import { LOGIN_PATH } from "@/lib/routes";
 import { summarize } from "@/lib/shopping";
@@ -19,11 +25,13 @@ export default async function ShoppingPage() {
   if (items && !items.ok && items.error === "unauthenticated") redirect(LOGIN_PATH);
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-10">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Shopping</h1>
-        <p className="text-muted-foreground mt-1">Keep a shopping list.</p>
-      </header>
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8 lg:py-10">
+      <PageHeader
+        title="Shopping"
+        description="Keep a shopping list."
+        icon={BasketIcon}
+        tone="peach"
+      />
 
       {items?.ok ? (
         <>
@@ -37,17 +45,24 @@ export default async function ShoppingPage() {
           </Card>
 
           <Card data-testid="shopping-list">
-            <CardHeader>
+            <CardHeader className="grid-cols-[1fr_auto] items-center">
               <CardTitle>Your list</CardTitle>
-              <CardDescription>{summarize(items.data)}</CardDescription>
+              <Badge variant="warning">{summarize(items.data)}</Badge>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 sm:px-4">
               {items.data.length === 0 ? (
-                <p className="text-muted-foreground text-sm" data-testid="shopping-empty">
-                  Your shopping list is empty. Add the first item above.
-                </p>
+                <EmptyState
+                  tone="peach"
+                  illustration={<BasketIllustration />}
+                  title="Your basket is empty"
+                  className="mx-3 sm:mx-2"
+                  data-testid="shopping-empty"
+                >
+                  Your shopping list is empty. Add the first item above and it will wait here for
+                  you.
+                </EmptyState>
               ) : (
-                <ul className="divide-y">
+                <ul className="flex flex-col gap-1">
                   {items.data.map((item) => (
                     <ItemRow key={item.id} item={item} />
                   ))}
@@ -57,14 +72,11 @@ export default async function ShoppingPage() {
           </Card>
         </>
       ) : (
-        <Card className="max-w-lg" data-testid="shopping-unavailable">
-          <CardHeader>
-            <CardTitle>Your shopping list could not be loaded</CardTitle>
-            <CardDescription>
-              Orbit could not reach its server. Try again in a moment.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <UnavailableCard
+          data-testid="shopping-unavailable"
+          title="Your shopping list could not be loaded"
+          description="Orbit could not reach its server. Try again in a moment."
+        />
       )}
     </main>
   );

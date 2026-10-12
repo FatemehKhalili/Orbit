@@ -39,8 +39,9 @@ and self-hostable, so a person's life data stays under their control.
 | 2     | Data foundations: Alembic migrations, model base, sessions, `uv.lock`, Dependabot | Complete    |
 | 3     | Owner account and app shell: sign-in, sessions, signed-in layout and navigation, module placeholders, production image checks in CI | Complete    |
 | 4     | Shopping: the first module, one personal shopping list per owner     | Complete    |
-| 5     | Habits: daily habits checked off over the last seven days, archive and delete, one instance timezone | In progress |
-| 6+    | To be defined                                                         | Not started |
+| 5     | Habits: daily habits checked off over the last seven days, archive and delete, one instance timezone | Complete    |
+| 6     | Run Orbit for real: production deployment, backup and restore, sign-in throttling, data export, upgrade and rollback | Complete    |
+| 7+    | To be defined                                                         | Not started |
 
 Phase 1 delivers no product features. The web app shows a placeholder with the six
 modules and the backend's health.
@@ -163,3 +164,62 @@ targets or measurable habits, notes per check-in, history beyond seven days in t
 pages, reminders, a timezone per user or habit, categories, reordering, a Dashboard
 summary, Calendar integration, pagination, bulk actions, undo and a delete confirmation
 step.
+
+## Phase 6: Run Orbit for real
+
+Phase 6 adds no module features. It makes Orbit something a person can install on a home
+server or any Docker host and trust with their data: kept private by default, backed up,
+recoverable, exportable, and safe to upgrade and roll back. See
+[ADR 0009](../decisions/0009-production-deployment-backups-and-upgrades.md) and
+[ADR 0010](../decisions/0010-sign-in-throttling-and-known-devices.md). The approved
+planning report is on PR #17.
+
+**Production deployment.** `compose.production.yml` runs the production images with a
+one-off migration step before the API, health-ordered startup, restart on failure and its
+own data volume. Only the web app is published, on 127.0.0.1; the API and database are
+not reachable from outside Docker. An opt-in `https` profile adds Caddy with a local
+certificate authority (or a public certificate). In production the API docs are off, the
+web app sends security headers, and logs never contain passwords, tokens, cookies, query
+strings or bodies. Guide: [docs/deployment/](../deployment/README.md).
+
+**Backup and restore.** `scripts/backup.sh` writes a consistent database dump (mode 600,
+never inside the repository) with a checksum, while Orbit runs; `--keep N` prunes.
+`scripts/restore.sh` checks the file, restores into a new database and swaps it in,
+refuses to replace data without `--force` and the typed database name, and keeps the
+replaced database. Encryption, off-site copies, retention, scheduling, a recovery
+runbook and the limits are documented in
+[Backups and recovery](../deployment/backup-and-recovery.md).
+
+**Sign-in throttling.** Failed sign-ins are counted in the database per email (known or
+not), per client address behind a trusted proxy, and across the instance. Blocks start
+at 30 seconds after five failures and double up to 15 minutes; they always end. A
+blocked attempt gets 429 with `Retry-After` and the login page says how long to wait.
+Browsers that have signed in before are counted on their own, so strangers cannot lock
+the owner out of them, and `clear-login-blocks` lifts every block from the server.
+Expired sessions and old sign-in records are purged on sign-in and by `purge-expired`.
+Accepted limitation: someone who knows the owner's email can keep a browser that has
+never signed in waiting, up to 15 minutes at a time; known browsers are unaffected.
+
+**Data export.** "Download my data" gives the owner a JSON file with their account
+details, every shopping item, and every habit with its full check-in history, following
+a published, versioned schema ([docs/export/](../export/README.md)). It never contains the
+password hash, sessions or other secrets, and it is not a backup.
+
+**Upgrade and rollback.** Upgrading is: back up, check out the new tag, `up -d --build`.
+Rolling back restores the pre-upgrade backup into the previous release; downgrade
+migrations are never used on real data. The release process is in
+[docs/releasing.md](../releasing.md).
+
+**Testing:** API tests cover the throttle at its boundaries (the fifth failure, the cap,
+expiry, a correct password while blocked, 50 concurrent attempts, unknown emails, known
+devices, the global and address limits), the export (contents, schema, isolation, no
+secrets) and the production defaults (docs off, log contents). CI adds three jobs: the
+production stack (published ports, smoke test, HTTPS profile), a backup and restore round
+trip that proves the data, export and password are identical after losing the volume,
+and an upgrade from `v0.5.0-phase5` in place and into the production stack, with a
+rollback by restoring the backup.
+
+Out of scope for Phase 6: import, built-in backup encryption or scheduling, cloud backup
+targets, published images, several users, password reset by email, two-factor sign-in,
+metrics, a browser-test framework, the Node runtime upgrade and the open Dependabot
+updates.

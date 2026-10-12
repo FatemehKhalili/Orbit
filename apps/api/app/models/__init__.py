@@ -2,6 +2,7 @@
 
 from app.models.base import NAMING_CONVENTION, Base
 from app.models.habits import Habit, HabitCheckIn
+from app.models.login import LoginDevice, LoginThrottle
 from app.models.session import AuthSession
 from app.models.shopping import ShoppingItem
 from app.models.user import User
@@ -12,6 +13,8 @@ __all__ = [
     "Base",
     "Habit",
     "HabitCheckIn",
+    "LoginDevice",
+    "LoginThrottle",
     "ShoppingItem",
     "User",
 ]
