@@ -152,7 +152,10 @@ is not on the next day. A time skipped when the clocks go forward is a 422; a re
 time takes its first occurrence. An event lasts at most 366 days, measured in real time.
 Any date from 0001-01-01 to 9999-12-31 can be listed; a time whose instant would fall
 before year 1 or after year 9999 in UTC (only possible on those first and last days) is a
-422. Every write goes through
+422. A timed event saved within about 16 hours of the start of year 1 or the end of year
+9999 may have no local date in another timezone: if `ORBIT_TIMEZONE` later changes, or a
+backup is restored into an instance set to another zone, reading or changing that event
+returns a 500 (deleting it and the export still work). Every write goes through
 `app/calendar/service.py`
 ([ADR 0011](../../docs/decisions/0011-calendar-events-and-time.md)). Ownership works as in
 Shopping.
