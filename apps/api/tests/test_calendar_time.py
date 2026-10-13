@@ -6,7 +6,10 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.calendar.local_time import (
+    FIRST_INSTANT,
+    LAST_INSTANT,
     NonexistentLocalTime,
+    OutOfRange,
     day_bounds,
     day_start,
     local_day,
@@ -170,3 +173,61 @@ def test_an_event_ending_at_midnight_across_a_clock_change():
     starts_at = berlin(date(2026, 10, 24), time(22))
     ends_at = berlin(date(2026, 10, 26), time(0))
     assert timed_days(starts_at, ends_at, BERLIN) == (date(2026, 10, 24), date(2026, 10, 25))
+
+
+# --- The first and last dates (0001-01-01, 9999-12-31) -----------------------------------
+
+TOKYO = ZoneInfo("Asia/Tokyo")
+
+
+@pytest.mark.parametrize("zone", [UTC_ZONE, BERLIN, NEW_YORK, TOKYO])
+def test_day_bounds_cover_the_first_and_last_dates(zone):
+    first, last = date(1, 1, 1), date(9999, 12, 31)
+
+    assert day_bounds(last, last, zone)[1] == LAST_INSTANT
+    assert day_bounds(first, first, zone)[0] <= day_start(date(1, 1, 2), zone)
+    assert day_bounds(first, last, zone)[1] == LAST_INSTANT
+
+
+def test_day_bounds_are_exact_where_the_instants_exist():
+    # West of UTC the first day starts after 0001-01-01 00:00 UTC; east of it, before.
+    assert day_bounds(date(1, 1, 1), date(1, 1, 1), NEW_YORK) == (
+        day_start(date(1, 1, 1), NEW_YORK),
+        day_start(date(1, 1, 2), NEW_YORK),
+    )
+    assert day_bounds(date(1, 1, 1), date(1, 1, 1), BERLIN)[0] == FIRST_INSTANT
+    assert day_bounds(date(9999, 12, 30), date(9999, 12, 30), UTC_ZONE) == (
+        utc(9999, 12, 30),
+        utc(9999, 12, 31),
+    )
+
+
+def test_the_start_of_the_first_day_east_of_utc_is_out_of_range():
+    with pytest.raises(OutOfRange):
+        day_start(date(1, 1, 1), BERLIN)
+
+
+@pytest.mark.parametrize(
+    ("day", "at", "zone"),
+    [
+        (date(1, 1, 1), time(0, 30), BERLIN),  # 0000-12-31 23:36:32 UTC
+        (date(1, 1, 1), time(0, 0), TOKYO),
+        (date(9999, 12, 31), time(19, 0), NEW_YORK),  # 10000-01-01 00:00 UTC
+    ],
+)
+def test_a_local_time_outside_the_instants_is_out_of_range(day, at, zone):
+    with pytest.raises(OutOfRange):
+        to_instant(day, at, zone)
+
+
+@pytest.mark.parametrize(
+    ("day", "at", "zone", "expected"),
+    [
+        (date(1, 1, 1), time(0, 0), UTC_ZONE, FIRST_INSTANT),
+        (date(1, 1, 1), time(1, 0), BERLIN, utc(1, 1, 1, 0, 6, 32)),  # local mean time, +00:53:28
+        (date(9999, 12, 31), time(23, 59), UTC_ZONE, utc(9999, 12, 31, 23, 59)),
+        (date(9999, 12, 31), time(18, 59), NEW_YORK, utc(9999, 12, 31, 23, 59)),
+    ],
+)
+def test_local_times_at_the_edges_that_exist_convert(day, at, zone, expected):
+    assert to_instant(day, at, zone) == expected

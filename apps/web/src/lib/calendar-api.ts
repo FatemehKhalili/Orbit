@@ -1,6 +1,12 @@
 /** Calls to the API's /calendar endpoints. Server-side only (ADR 0002). */
 
-import { apiRequest, type ApiOptions, type ApiResult } from "@/lib/api-client";
+import {
+  apiRequest,
+  apiRequestWithMessage,
+  type ApiOptions,
+  type ApiResult,
+  type ApiResultWithMessage,
+} from "@/lib/api-client";
 import type { Day } from "@/lib/time-api";
 
 /** A local time of day as the API sends it, "09:00" (ADR 0011). */
@@ -84,7 +90,15 @@ function fromApi(event: ApiEvent): CalendarEvent {
   };
 }
 
-function mapEvent<T, U>(result: ApiResult<T>, map: (data: T) => U): ApiResult<U> {
+function mapEvent<T, U>(result: ApiResult<T>, map: (data: T) => U): ApiResult<U>;
+function mapEvent<T, U>(
+  result: ApiResultWithMessage<T>,
+  map: (data: T) => U,
+): ApiResultWithMessage<U>;
+function mapEvent<T, U>(
+  result: ApiResultWithMessage<T>,
+  map: (data: T) => U,
+): ApiResultWithMessage<U> {
   return result.ok ? { ok: true, data: map(result.data) } : result;
 }
 
@@ -105,15 +119,21 @@ export async function getEvent(
   id: string,
   options: ApiOptions = {},
 ): Promise<ApiResult<CalendarEvent>> {
-  return mapEvent(await apiRequest<ApiEvent>(eventPath(id), { token }, options), fromApi);
+  const result = await apiRequest<ApiEvent>(eventPath(id), { token }, options);
+  return mapEvent(result, fromApi);
 }
 
+/** A refused event comes back with the API's reason as `message` (ADR 0011's rules). */
 export async function createEvent(
   token: string,
   event: NewEvent,
   options: ApiOptions = {},
-): Promise<ApiResult<CalendarEvent>> {
-  const result = await apiRequest<ApiEvent>(EVENTS, { method: "POST", token, json: event }, options);
+): Promise<ApiResultWithMessage<CalendarEvent>> {
+  const result = await apiRequestWithMessage<ApiEvent>(
+    EVENTS,
+    { method: "POST", token, json: event },
+    options,
+  );
   return mapEvent(result, fromApi);
 }
 
@@ -122,8 +142,8 @@ export async function updateEvent(
   id: string,
   changes: EventChanges,
   options: ApiOptions = {},
-): Promise<ApiResult<CalendarEvent>> {
-  const result = await apiRequest<ApiEvent>(
+): Promise<ApiResultWithMessage<CalendarEvent>> {
+  const result = await apiRequestWithMessage<ApiEvent>(
     eventPath(id),
     { method: "PATCH", token, json: changes },
     options,

@@ -149,7 +149,10 @@ history is kept. Ownership works as in Shopping.
 Responses carry the local days and times, the stored instants (`starts_at`, `ends_at`), and
 `first_day` and `last_day`: the days the event is on. An event ending exactly at midnight
 is not on the next day. A time skipped when the clocks go forward is a 422; a repeated
-time takes its first occurrence. An event lasts at most 366 days. Every write goes through
+time takes its first occurrence. An event lasts at most 366 days, measured in real time.
+Any date from 0001-01-01 to 9999-12-31 can be listed; a time whose instant would fall
+before year 1 or after year 9999 in UTC (only possible on those first and last days) is a
+422. Every write goes through
 `app/calendar/service.py`
 ([ADR 0011](../../docs/decisions/0011-calendar-events-and-time.md)). Ownership works as in
 Shopping.

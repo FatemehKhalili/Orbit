@@ -74,19 +74,60 @@ const ERRORS_BY_STATUS: Record<number, ApiError> = {
   422: "invalid",
 };
 
-/** Sends a request and parses a JSON response body (`undefined` for 204). */
-export async function apiRequest<T>(
+/** A failure that may carry the API's own message for the owner. */
+export type ApiResultWithMessage<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: ApiError; message?: string };
+
+async function send<T>(
   path: string,
-  init: ApiInit = {},
-  options: ApiOptions = {},
-): Promise<ApiResult<T>> {
+  init: ApiInit,
+  options: ApiOptions,
+  withMessage: boolean,
+): Promise<ApiResultWithMessage<T>> {
   const response = await apiFetch(path, init, options);
   if (!response) return { ok: false, error: "unavailable" };
-  if (!response.ok) return { ok: false, error: ERRORS_BY_STATUS[response.status] ?? "unavailable" };
+  if (!response.ok) {
+    const error = ERRORS_BY_STATUS[response.status] ?? "unavailable";
+    const message = withMessage && error === "invalid" ? await textDetail(response) : undefined;
+    return message ? { ok: false, error, message } : { ok: false, error };
+  }
   if (response.status === 204) return { ok: true, data: undefined as T };
   try {
     return { ok: true, data: (await response.json()) as T };
   } catch {
     return { ok: false, error: "unavailable" };
   }
+}
+
+/** The `detail` of an error response when it is text, not a field-by-field list. */
+async function textDetail(response: Response): Promise<string | undefined> {
+  try {
+    const body: unknown = await response.json();
+    const detail = (body as { detail?: unknown } | null)?.detail;
+    return typeof detail === "string" && detail ? detail : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Sends a request and parses a JSON response body (`undefined` for 204). */
+export async function apiRequest<T>(
+  path: string,
+  init: ApiInit = {},
+  options: ApiOptions = {},
+): Promise<ApiResult<T>> {
+  return send<T>(path, init, options, false);
+}
+
+/**
+ * Like apiRequest, but a 422 whose `detail` is text (a rule the API explains to the
+ * owner) also returns that text as `message`.
+ */
+export async function apiRequestWithMessage<T>(
+  path: string,
+  init: ApiInit = {},
+  options: ApiOptions = {},
+): Promise<ApiResultWithMessage<T>> {
+  return send<T>(path, init, options, true);
 }

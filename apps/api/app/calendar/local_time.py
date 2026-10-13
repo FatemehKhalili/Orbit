@@ -9,9 +9,19 @@ use any zone and the API passes `app.state.timezone`.
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+# The earliest and latest instants Python can hold, which bound every stored event.
+FIRST_INSTANT = datetime.min.replace(tzinfo=UTC)
+LAST_INSTANT = datetime.max.replace(tzinfo=UTC)
+
 
 class NonexistentLocalTime(ValueError):
     """A local time skipped when the clocks go forward (02:30 on a spring-forward day)."""
+
+
+class OutOfRange(ValueError):
+    """A local time whose instant falls outside FIRST_INSTANT..LAST_INSTANT, which happens
+    only within a day of 0001-01-01 or 9999-12-31 (00:30 on 0001-01-01 in Berlin comes
+    before 0001-01-01 00:00 UTC)."""
 
 
 def to_instant(day: date, at: time, zone: ZoneInfo) -> datetime:
@@ -21,9 +31,13 @@ def to_instant(day: date, at: time, zone: ZoneInfo) -> datetime:
     (`fold=0`). One that does not happen at all raises NonexistentLocalTime.
     """
     local = datetime.combine(day, at.replace(tzinfo=None, fold=0), tzinfo=zone)
-    instant = local.astimezone(UTC)
+    try:
+        instant = local.astimezone(UTC)
+        back = instant.astimezone(zone)
+    except OverflowError:
+        raise OutOfRange(f"{day.isoformat()} {at:%H:%M} in {zone.key} is out of range") from None
     # A skipped time comes back from UTC as a different wall time.
-    if instant.astimezone(zone).replace(tzinfo=None) != local.replace(tzinfo=None):
+    if back.replace(tzinfo=None) != local.replace(tzinfo=None):
         raise NonexistentLocalTime(f"{day.isoformat()} {at:%H:%M} does not exist in {zone.key}")
     return instant
 
@@ -33,15 +47,30 @@ def day_start(day: date, zone: ZoneInfo) -> datetime:
 
     Even where midnight itself is skipped (some zones change their clocks at 00:00),
     this is the instant the day begins: `fold=0` reads 00:00 with the offset before the
-    change, which lands exactly on the change.
+    change, which lands exactly on the change. OutOfRange where that instant is before
+    year 1 (0001-01-01 east of UTC).
     """
-    return datetime.combine(day, time(0), tzinfo=zone).astimezone(UTC)
+    try:
+        return datetime.combine(day, time(0), tzinfo=zone).astimezone(UTC)
+    except OverflowError:
+        raise OutOfRange(f"the start of {day.isoformat()} in {zone.key} is out of range") from None
 
 
 def day_bounds(first: date, last: date, zone: ZoneInfo) -> tuple[datetime, datetime]:
     """The instants `[start, end)` covering the local days `first` to `last`, inclusive.
-    Correct on 23- and 25-hour days."""
-    return day_start(first, zone), day_start(last + timedelta(days=1), zone)
+    Correct on 23- and 25-hour days.
+
+    Any date may be asked for. Where a bound lies beyond the instants Python can hold
+    (the start of 0001-01-01 east of UTC, the end of 9999-12-31), it is the first or last
+    instant instead: no event can lie beyond it.
+    """
+    try:
+        start = day_start(first, zone)
+    except OutOfRange:
+        start = FIRST_INSTANT
+    if last == date.max:
+        return start, LAST_INSTANT
+    return start, day_start(last + timedelta(days=1), zone)
 
 
 def local_day(instant: datetime, zone: ZoneInfo) -> date:

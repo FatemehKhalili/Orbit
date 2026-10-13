@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.orm import Session
 
-from app.calendar.local_time import NonexistentLocalTime, day_bounds, to_instant
+from app.calendar.local_time import NonexistentLocalTime, OutOfRange, day_bounds, to_instant
 from app.models import CalendarEvent, User
 
 # A typing guard for the forms, not a database rule (ADR 0011).
@@ -30,6 +30,7 @@ END_DAY_WITHOUT_TIME = "Give an end time with the end day, or leave both empty."
 NONEXISTENT_TIME = (
     "This time does not exist on that day because the clocks change. Choose another time."
 )
+OUT_OF_RANGE = "This time is too close to the year 1 or 9999 for Orbit. Choose another time."
 
 
 class InvalidEvent(ValueError):
@@ -82,6 +83,8 @@ def timed(
         )
     except NonexistentLocalTime:
         raise InvalidEvent(NONEXISTENT_TIME) from None
+    except OutOfRange:
+        raise InvalidEvent(OUT_OF_RANGE) from None
     if ends_at < starts_at:
         raise InvalidEvent(END_BEFORE_START)
     if ends_at - starts_at > timedelta(days=MAX_SPAN_DAYS):

@@ -456,6 +456,54 @@ def test_the_range_needs_two_dates(client, token, params):
     assert client.get(EVENTS, params=params, headers=bearer(token)).status_code == 422
 
 
+# --- The first and last dates -------------------------------------------------------------
+
+FIRST, LAST = date(1, 1, 1), date(9999, 12, 31)
+OUT_OF_RANGE = "This time is too close to the year 1 or 9999 for Orbit. Choose another time."
+
+
+@pytest.mark.parametrize("zone", ["UTC", BERLIN, "America/New_York", "Asia/Tokyo"])
+@pytest.mark.parametrize(
+    ("first", "last"),
+    [(LAST, LAST), (date(9999, 12, 25), LAST), (FIRST, FIRST), (FIRST, date(1, 1, 7))],
+)
+def test_the_range_works_on_the_first_and_last_dates(client, token, zone, first, last):
+    # /calendar?from=9999-12-25 asks for 9999-12-25 to 9999-12-31.
+    use_zone(client, zone)
+    assert listed(client, token, first, last) == []
+
+
+def test_events_on_the_first_and_last_dates_are_listed(client, token):
+    add(client, token, "Last day", when=all_day(LAST))
+    add(client, token, "Last evening", when=timed(LAST, "23:00", None, "23:59"))
+    add(client, token, "First day", when=all_day(FIRST, FIRST + timedelta(days=1)))
+    add(client, token, "First morning", when=timed(FIRST, "01:00"))
+
+    assert titles(client, token, date(9999, 12, 25), LAST) == ["Last day", "Last evening"]
+    assert titles(client, token, FIRST) == ["First day", "First morning"]
+    assert titles(client, token, FIRST + timedelta(days=1)) == ["First day"]
+
+
+@pytest.mark.parametrize(
+    ("zone", "when"),
+    [
+        (BERLIN, timed(FIRST, "00:30")),  # before 0001-01-01 00:00 UTC
+        ("America/New_York", timed(LAST, "19:00")),  # after 9999-12-31 23:59 UTC
+        ("America/New_York", timed(LAST, "18:00", None, "20:00")),
+    ],
+)
+def test_times_beyond_the_first_and_last_instants_are_refused(client, token, zone, when):
+    use_zone(client, zone)
+    response = client.post(EVENTS, json={"title": "Edge", "when": when}, headers=bearer(token))
+    assert response.status_code == 422
+    assert response.json() == {"detail": OUT_OF_RANGE}
+
+    event = add(client, token)
+    response = client.patch(event_url(event["id"]), json={"when": when}, headers=bearer(token))
+    assert response.status_code == 422
+    assert response.json() == {"detail": OUT_OF_RANGE}
+
+
 # --- Database rules -----------------------------------------------------------------------
 
 

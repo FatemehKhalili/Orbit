@@ -9,9 +9,15 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UnavailableCard } from "@/components/unavailable-card";
 import { getSessionToken, requireUser } from "@/lib/auth";
-import { agendaEnd, agendaStart, AGENDA_DAYS, buildAgenda, rangeLabel } from "@/lib/calendar";
+import {
+  agendaEnd,
+  agendaNeighbours,
+  agendaStart,
+  AGENDA_DAYS,
+  buildAgenda,
+  rangeLabel,
+} from "@/lib/calendar";
 import { listEvents } from "@/lib/calendar-api";
-import { addDays } from "@/lib/days";
 import { LOGIN_PATH } from "@/lib/routes";
 import { getTime } from "@/lib/time-api";
 import { cn } from "@/lib/utils";
@@ -36,6 +42,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
   if ([time, events].some((result) => result && !result.ok && result.error === "unauthenticated")) {
     redirect(LOGIN_PATH);
   }
+  const neighbours = first ? agendaNeighbours(first) : null;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8 lg:py-10">
@@ -50,14 +57,16 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
       {time?.ok && first && events?.ok ? (
         <>
           <nav aria-label="Weeks" className="flex flex-wrap items-center gap-2">
-            <Link
-              href={agendaHref(addDays(first, -AGENDA_DAYS), time.data.today)}
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-              data-testid="calendar-previous"
-            >
-              <ArrowBackIcon />
-              Previous {AGENDA_DAYS} days
-            </Link>
+            {neighbours?.previous && (
+              <Link
+                href={agendaHref(neighbours.previous, time.data.today)}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+                data-testid="calendar-previous"
+              >
+                <ArrowBackIcon />
+                Previous {AGENDA_DAYS} days
+              </Link>
+            )}
             {first !== time.data.today && (
               <Link
                 href="/calendar"
@@ -67,14 +76,16 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
                 Today
               </Link>
             )}
-            <Link
-              href={agendaHref(addDays(first, AGENDA_DAYS), time.data.today)}
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-              data-testid="calendar-next"
-            >
-              Next {AGENDA_DAYS} days
-              <ArrowForwardIcon />
-            </Link>
+            {neighbours?.next && (
+              <Link
+                href={agendaHref(neighbours.next, time.data.today)}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+                data-testid="calendar-next"
+              >
+                Next {AGENDA_DAYS} days
+                <ArrowForwardIcon />
+              </Link>
+            )}
           </nav>
 
           <Card data-testid="agenda">

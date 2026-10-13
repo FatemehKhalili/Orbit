@@ -135,4 +135,18 @@ describe("calendar API calls", () => {
 
     expect(await getEvent("tok", apiEvent.id, { env, fetchImpl })).toEqual({ ok: false, error });
   });
+
+  it("passes the API's reason for a refused save on to the form", async () => {
+    const detail = "This time does not exist on that day because the clocks change. Choose another time.";
+    const body = { title: "Dentist", notes: null, when: { all_day: true as const, start_day: "2026-10-14", end_day: null } };
+
+    expect(await createEvent("tok", body, { env, fetchImpl: respondWith(422, { detail }) })).toEqual({
+      ok: false,
+      error: "invalid",
+      message: detail,
+    });
+    expect(
+      await updateEvent("tok", apiEvent.id, body, { env, fetchImpl: respondWith(422, { detail }) }),
+    ).toEqual({ ok: false, error: "invalid", message: detail });
+  });
 });

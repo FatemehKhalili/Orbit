@@ -10,7 +10,7 @@
  * only counts calendar dates, so the web server's own timezone never matters.
  */
 
-import type { ApiError, ApiResult } from "@/lib/api-client";
+import type { ApiError, ApiResult, ApiResultWithMessage } from "@/lib/api-client";
 import type {
   CalendarEvent,
   EventChanges,
@@ -34,6 +34,11 @@ export const EVENT_LIMITS = { title: 200, notes: 8000, spanDays: 366 } as const;
 
 /** The agenda shows this many days, and moves by as many. */
 export const AGENDA_DAYS = 7;
+
+/** The first day the API accepts (Python's date range, which ends on 9999-12-31). */
+const FIRST_DAY = "0001-01-01";
+/** The latest first day of a whole agenda: seven days ending on 9999-12-31. */
+const LAST_AGENDA_START = "9999-12-25";
 
 /** How many of today's events the Dashboard lists before "and N more today". */
 export const TODAY_PLANS_LIMIT = 5;
@@ -66,26 +71,29 @@ export const EVENT_ERRORS = {
   tooLong: `An event can last at most ${EVENT_LIMITS.spanDays} days.`,
   missingEvent: "Orbit could not tell which event to change. Reload the page and try again.",
   notConfirmed: "Confirm that you want to delete this event.",
-  // The API refuses, for example, a time skipped when the clocks change.
-  invalid:
-    "Orbit could not save this event. Check the days and times: a time skipped when the clocks change cannot be used.",
+  // When the API gives no reason of its own (it usually does: see failed()).
+  invalid: "Orbit could not save this event. Check the days and times.",
   not_found: "This event no longer exists. It may have been deleted elsewhere.",
   conflict: "Orbit could not save this change. Reload the page and try again.",
   unavailable: "Orbit could not reach its server. Try again in a moment.",
 } as const;
 
 export type CalendarApi = {
-  create: (token: string, event: NewEvent) => Promise<ApiResult<CalendarEvent>>;
-  update: (token: string, id: string, changes: EventChanges) => Promise<ApiResult<CalendarEvent>>;
+  create: (token: string, event: NewEvent) => Promise<ApiResultWithMessage<CalendarEvent>>;
+  update: (
+    token: string,
+    id: string,
+    changes: EventChanges,
+  ) => Promise<ApiResultWithMessage<CalendarEvent>>;
   remove: (token: string, id: string) => Promise<ApiResult<undefined>>;
 };
 
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-/** A real calendar date written YYYY-MM-DD (not 2026-02-30). */
+/** A real calendar date written YYYY-MM-DD (not 2026-02-30), from 0001-01-01 on. */
 export function isDay(value: string): value is Day {
-  if (!DAY_PATTERN.test(value)) return false;
+  if (!DAY_PATTERN.test(value) || value < FIRST_DAY) return false;
   // "2026-13-01" is no date at all; "2026-02-30" rolls over to March.
   const date = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
@@ -119,6 +127,13 @@ export function eventFields(event: CalendarEvent): EventFields {
   };
 }
 
+const MINUTES_PER_DAY = 24 * 60;
+
+/** "09:30" → 570. */
+function minutes(time: string): number {
+  return Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+}
+
 function checkWhen(fields: EventFields): EventWhen | string {
   if (!isDay(fields.startDay)) return EVENT_ERRORS.startDayMissing;
   if (fields.endDay && !isDay(fields.endDay)) return EVENT_ERRORS.endDayInvalid;
@@ -147,11 +162,11 @@ function checkWhen(fields: EventFields): EventWhen | string {
   }
   const last = endDay ?? fields.startDay;
   const span = daysBetween(fields.startDay, last);
-  // "HH:MM" strings compare in time order.
-  if (span < 0 || (span === 0 && fields.endTime < fields.startTime)) {
-    return EVENT_ERRORS.endBeforeStart;
-  }
-  if (span > EVENT_LIMITS.spanDays) return EVENT_ERRORS.tooLong;
+  // In minutes of local clock time. The API measures real time, which differs by an hour
+  // across a clock change; its own message is shown when it refuses.
+  const length = span * MINUTES_PER_DAY + minutes(fields.endTime) - minutes(fields.startTime);
+  if (length < 0) return EVENT_ERRORS.endBeforeStart;
+  if (length > EVENT_LIMITS.spanDays * MINUTES_PER_DAY) return EVENT_ERRORS.tooLong;
   return {
     all_day: false,
     start_day: fields.startDay,
@@ -171,8 +186,16 @@ export function validateEvent(fields: EventFields): NewEvent | string {
   return { title: fields.title, notes: fields.notes || null, when };
 }
 
-function failed(error: ApiError, fields?: EventFields): EventFormState {
-  return failedState(error, EVENT_ERRORS satisfies ApiErrorMessages, fields);
+/** A refused save shows the API's reason when it gives one (a clock change, the limits). */
+function failed(
+  result: { error: ApiError; message?: string },
+  fields?: EventFields,
+): EventFormState {
+  const state = failedState(result.error, EVENT_ERRORS satisfies ApiErrorMessages, fields);
+  if (state.status === "error" && result.error === "invalid" && result.message) {
+    return { ...state, error: result.message };
+  }
+  return state;
 }
 
 export async function performAddEvent(
@@ -186,7 +209,7 @@ export async function performAddEvent(
   if (typeof event === "string") return { status: "error", error: event, fields };
 
   const result = await api.create(token, event);
-  if (!result.ok) return failed(result.error, fields);
+  if (!result.ok) return failed(result, fields);
   return { status: "success", message: `Added “${result.data.title}”.` };
 }
 
@@ -204,7 +227,7 @@ export async function performEditEvent(
 
   // Sends every field, so emptying the notes clears them and the time is replaced whole.
   const result = await api.update(token, id, event);
-  if (!result.ok) return failed(result.error, fields);
+  if (!result.ok) return failed(result, fields);
   return { status: "success" };
 }
 
@@ -226,13 +249,37 @@ export async function performDeleteEvent(
 
   const result = await api.remove(token, id);
   // Already gone is what the user wanted.
-  if (!result.ok && result.error !== "not_found") return failed(result.error);
+  if (!result.ok && result.error !== "not_found") return failed(result);
   return { status: "success" };
 }
 
-/** The agenda's first day: `?from=` when it is a real date, today otherwise. */
+/**
+ * The agenda's first day: `?from=` when it is a real date, today otherwise. Near the
+ * last day there is, it starts early enough to show seven whole days.
+ */
 export function agendaStart(from: string | string[] | undefined, today: Day): Day {
-  return typeof from === "string" && isDay(from) ? from : today;
+  const first = typeof from === "string" && isDay(from) ? from : today;
+  return first > LAST_AGENDA_START ? LAST_AGENDA_START : first;
+}
+
+/**
+ * Where Previous and Next lead: seven days back and on, stopping at the first and last
+ * days there are. Null when there is nothing further that way.
+ */
+export function agendaNeighbours(first: Day): { previous: Day | null; next: Day | null } {
+  const previous =
+    first <= FIRST_DAY
+      ? null
+      : daysBetween(FIRST_DAY, first) < AGENDA_DAYS
+        ? FIRST_DAY
+        : addDays(first, -AGENDA_DAYS);
+  const next =
+    first >= LAST_AGENDA_START
+      ? null
+      : daysBetween(first, LAST_AGENDA_START) < AGENDA_DAYS
+        ? LAST_AGENDA_START
+        : addDays(first, AGENDA_DAYS);
+  return { previous, next };
 }
 
 /** The last day of an agenda starting on `first`. */
