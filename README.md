@@ -16,8 +16,8 @@ one place.
 > (running Orbit for real: production deployment, backups, sign-in throttling, export) is
 > complete, tagged `v0.6.0-phase6`. Phase 7 (Today Dashboard: check off today's habits and
 > the first shopping items from the Dashboard) is complete, tagged `v0.7.0-phase7`. Phase 8
-> (the internal Calendar: a seven-day agenda and today's plans on the Dashboard) is in
-> progress. Finance and Wishlist are placeholders.
+> (the internal Calendar: a seven-day agenda and today's plans on the Dashboard) is
+> complete, tagged `v0.8.0-phase8`. Finance and Wishlist are placeholders.
 
 ## MVP modules
 

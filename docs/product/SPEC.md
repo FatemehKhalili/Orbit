@@ -42,7 +42,7 @@ and self-hostable, so a person's life data stays under their control.
 | 5     | Habits: daily habits checked off over the last seven days, archive and delete, one instance timezone | Complete    |
 | 6     | Run Orbit for real: production deployment, backup and restore, sign-in throttling, data export, upgrade and rollback | Complete    |
 | 7     | Today Dashboard: check off today's habits and the first shopping items from the Dashboard | Complete    |
-| 8     | Calendar: all-day and timed events in a seven-day agenda, "Today's plans" on the Dashboard | In progress |
+| 8     | Calendar: all-day and timed events in a seven-day agenda, "Today's plans" on the Dashboard | Complete    |
 | 9+    | To be defined (proposed for 9: two-way Google Calendar sync, ADR 0012) | Not started |
 
 Phase 1 delivers no product features. The web app shows a placeholder with the six
