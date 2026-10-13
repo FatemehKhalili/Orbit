@@ -173,9 +173,11 @@ jobs:
       - name: Seed data, sign in, record what is there
         run: |
           .github/scripts/orbit-data.sh seed
+          .github/scripts/orbit-data.sh seed-calendar
           token=$(.github/scripts/orbit-data.sh token)
           echo "TOKEN=$token" >> "$GITHUB_ENV"
           .github/scripts/orbit-data.sh export "$token" > "$RUNNER_TEMP/export-before.json"
+          jq -e '(.calendar.events | length) == 90' "$RUNNER_TEMP/export-before.json"
           ./scripts/db-fingerprint.sh | tee "$RUNNER_TEMP/fingerprint-before.txt"
       - name: Back up while Orbit runs
         run: ./scripts/backup.sh "$BACKUPS" && ls -l "$BACKUPS"
@@ -222,7 +224,7 @@ jobs:
         run: docker compose down --volumes
 
   upgrade:
-    name: Upgrade from v0.6.0-phase6 and roll back
+    name: Upgrade from v0.7.0-phase7 and roll back
     runs-on: ubuntu-latest
     needs: [api, web]
     env:
@@ -231,24 +233,27 @@ jobs:
       COMPOSE_FILE: compose.production.yml:.github/compose.production.ci.yml
       ORBIT_CI_EMAIL: owner@example.com
       ORBIT_CI_PASSWORD: ci-only-owner-password
+      # The newest migration. The upgrade adds its table (calendar_events) and nothing else.
+      HEAD_REVISION: b3d81c5e0f27
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - run: |
-          echo "OLD=$RUNNER_TEMP/v0.6.0-phase6" >> "$GITHUB_ENV"
+          echo "OLD=$RUNNER_TEMP/v0.7.0-phase7" >> "$GITHUB_ENV"
           echo "BACKUPS=$RUNNER_TEMP/backups" >> "$GITHUB_ENV"
-      - name: Run v0.6.0-phase6 (its production Compose setup)
+      - name: Run v0.7.0-phase7 (its production Compose setup)
         run: |
-          git worktree add "$OLD" v0.6.0-phase6
+          git worktree add "$OLD" v0.7.0-phase7
           (cd "$OLD" && ./scripts/setup-env.sh && docker compose up --build --detach --wait)
           cp "$OLD/.env" .env
-      - name: Seed data on v0.6.0 and back it up, as the upgrade guide says
+      - name: Seed data on v0.7.0 and back it up, as the upgrade guide says
         run: |
           export ORBIT_COMPOSE_FILE="$OLD/compose.production.yml"
           .github/scripts/orbit-data.sh seed
           echo "TOKEN=$(.github/scripts/orbit-data.sh token)" >> "$GITHUB_ENV"
-          ./scripts/db-fingerprint.sh | tee "$RUNNER_TEMP/v06.txt"
+          ./scripts/db-fingerprint.sh | tee "$RUNNER_TEMP/v07.txt"
+          if grep -q '^calendar_events ' "$RUNNER_TEMP/v07.txt"; then exit 1; fi
           ./scripts/backup.sh "$BACKUPS"
       - name: Upgrade in place (same data volume, new code)
         run: |
@@ -256,25 +261,37 @@ jobs:
           docker compose up --build --detach --wait
           test "$(docker compose ps -a --format '{{.ExitCode}}' migrate)" = 0
           docker compose exec -T api alembic check
+      # Every table v0.7.0 had is compared exactly. Only the migration version and the
+      # new, empty calendar_events table differ, and each is checked on its own.
       - name: Upgraded data is unchanged, and the old session and password work
         run: |
-          ./scripts/db-fingerprint.sh | diff "$RUNNER_TEMP/v06.txt" -
-          .github/scripts/orbit-data.sh export "$TOKEN" | jq -e '(.shopping.items | length) == 40 and (.habits.habits | map(.check_ins | length) | add) == 1004'
+          .github/scripts/upgrade-check.sh "$RUNNER_TEMP/v07.txt"
+          .github/scripts/orbit-data.sh export "$TOKEN" | jq -e '.format_version == "1.1" and (.shopping.items | length) == 40 and (.habits.habits | map(.check_ins | length) | add) == 1004 and .calendar.events == []'
           .github/scripts/orbit-data.sh token > /dev/null
       - name: Smoke test on the upgraded data
         env:
           ORBIT_SMOKE_EMAIL: owner@example.com
           ORBIT_SMOKE_PASSWORD: ci-only-owner-password
         run: ./scripts/smoke-test.sh
-      - name: Roll back to v0.6.0 by restoring the pre-upgrade backup
+      - name: Roll back to v0.7.0 by restoring the pre-upgrade backup
         run: |
           docker compose down
           (cd "$OLD" && docker compose up --detach --wait db)
           echo orbit | ./scripts/restore.sh --force "$BACKUPS"/orbit-*.dump
-          ./scripts/db-fingerprint.sh | diff "$RUNNER_TEMP/v06.txt" -
+          ./scripts/db-fingerprint.sh | diff "$RUNNER_TEMP/v07.txt" -
           (cd "$OLD" && docker compose up --detach --wait)
           .github/scripts/orbit-data.sh token > /dev/null
           (cd "$OLD" && docker compose exec -T api alembic check)
+      - name: The v0.7.0 backup restores into a fresh install of the new code
+        run: |
+          (cd "$OLD" && docker compose down --volumes)
+          docker compose up --detach --wait db
+          ./scripts/restore.sh "$BACKUPS"/orbit-*.dump
+          docker compose up --detach --wait
+          test "$(docker compose ps -a --format '{{.ExitCode}}' migrate)" = 0
+          docker compose exec -T api alembic check
+          .github/scripts/upgrade-check.sh "$RUNNER_TEMP/v07.txt"
+          .github/scripts/orbit-data.sh token > /dev/null
       - if: failure()
         run: |
           docker compose logs

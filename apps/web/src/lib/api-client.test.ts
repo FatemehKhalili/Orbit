@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { apiFetch, apiRequest } from "./api-client";
+import { apiFetch, apiRequest, apiRequestWithMessage } from "./api-client";
 
 const env = { ORBIT_API_URL: "http://api:8000/" };
 
@@ -111,5 +111,46 @@ describe("apiRequest", () => {
       ok: false,
       error: "unavailable",
     });
+  });
+});
+
+describe("apiRequestWithMessage", () => {
+  it("returns the API's reason for a refused request", async () => {
+    const fetchImpl = respondWith(422, { detail: "An event can last at most 366 days." });
+
+    expect(await apiRequestWithMessage("/x", {}, { env, fetchImpl })).toEqual({
+      ok: false,
+      error: "invalid",
+      message: "An event can last at most 366 days.",
+    });
+  });
+
+  it("has no message for a field-by-field validation list or a body that is not JSON", async () => {
+    const list = respondWith(422, { detail: [{ loc: ["body", "title"], msg: "required" }] });
+    const html = vi.fn<typeof fetch>().mockResolvedValue(new Response("<html>", { status: 422 }));
+
+    expect(await apiRequestWithMessage("/x", {}, { env, fetchImpl: list })).toEqual({
+      ok: false,
+      error: "invalid",
+    });
+    expect(await apiRequestWithMessage("/x", {}, { env, fetchImpl: html })).toEqual({
+      ok: false,
+      error: "invalid",
+    });
+  });
+
+  it("only reads a message for 422, and otherwise works like apiRequest", async () => {
+    expect(
+      await apiRequestWithMessage("/x", {}, { env, fetchImpl: respondWith(409, { detail: "x" }) }),
+    ).toEqual({ ok: false, error: "conflict" });
+    expect(
+      await apiRequestWithMessage("/x", {}, { env, fetchImpl: respondWith(200, { id: "1" }) }),
+    ).toEqual({ ok: true, data: { id: "1" } });
+  });
+
+  it("leaves apiRequest without a message", async () => {
+    const fetchImpl = respondWith(422, { detail: "An event can last at most 366 days." });
+
+    expect(await apiRequest("/x", {}, { env, fetchImpl })).toEqual({ ok: false, error: "invalid" });
   });
 });

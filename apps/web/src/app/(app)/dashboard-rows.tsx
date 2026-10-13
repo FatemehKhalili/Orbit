@@ -7,7 +7,7 @@ import { CheckIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { boughtFields, todayCheckInFields, type TodayHabit } from "@/lib/dashboard";
 import { IDLE } from "@/lib/forms";
-import type { Day } from "@/lib/habits-api";
+import type { Day } from "@/lib/time-api";
 import type { ShoppingItem } from "@/lib/shopping-api";
 import { cn } from "@/lib/utils";
 

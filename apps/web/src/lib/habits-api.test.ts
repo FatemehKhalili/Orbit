@@ -4,7 +4,6 @@ import {
   createHabit,
   deleteHabit,
   getHabit,
-  getTime,
   listHabits,
   setCheckIn,
   updateHabit,
@@ -56,21 +55,6 @@ function request(fetchImpl: ReturnType<typeof respondWith>) {
 const HABITS = "http://api:8000/habits/habits";
 
 describe("habits API calls", () => {
-  it("reads the instance's timezone and today's date", async () => {
-    const fetchImpl = respondWith(200, { timezone: "Europe/Berlin", today: "2026-10-11" });
-
-    expect(await getTime("tok", { env, fetchImpl })).toEqual({
-      ok: true,
-      data: { timezone: "Europe/Berlin", today: "2026-10-11" },
-    });
-    expect(request(fetchImpl)).toEqual({
-      url: "http://api:8000/time",
-      method: "GET",
-      authorization: "Bearer tok",
-      body: undefined,
-    });
-  });
-
   it("lists the active habits with the session token", async () => {
     const fetchImpl = respondWith(200, [apiHabit]);
 

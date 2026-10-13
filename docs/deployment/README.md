@@ -187,8 +187,9 @@ docker compose -f compose.production.yml up -d --build
 ```
 
 The restore works from any earlier Orbit version: the migrate step brings it up to date.
-CI did exactly this with a backup from `v0.5.0-phase5` up to `v0.6.0-phase6`; it now
-upgrades a `v0.6.0-phase6` production install in place, and rolls it back, on every change.
+CI does exactly this on every change with a backup from `v0.7.0-phase7`, and also
+upgrades a `v0.7.0-phase7` production install in place and rolls it back. Orbit 0.8.0 adds
+one table, `calendar_events`; the upgrade leaves every existing table as it was.
 
 ## Remove Orbit
 

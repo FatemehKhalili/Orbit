@@ -4,13 +4,25 @@ import { connection } from "next/server";
 import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/empty-state";
-import { ArrowForwardIcon, BasketIcon, SproutIcon } from "@/components/icons";
-import { BasketIllustration, SeedlingIllustration } from "@/components/illustrations";
+import { ArrowForwardIcon, BasketIcon, CalendarIcon, SproutIcon } from "@/components/icons";
+import {
+  BasketIllustration,
+  PlanetIllustration,
+  SeedlingIllustration,
+} from "@/components/illustrations";
 import { MODULE_LOOK, TONES, type Tone } from "@/components/modules";
 import { Badge, BadgeDot } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { checkApiHealth, type ApiHealth } from "@/lib/api-health";
 import { getSessionToken, requireUser } from "@/lib/auth";
+import {
+  AGENDA_DAYS,
+  moreTodayLabel,
+  todayPlans,
+  type TodayPlans,
+  weekPlansLabel,
+} from "@/lib/calendar";
+import { listEvents } from "@/lib/calendar-api";
 import {
   moreToBuyLabel,
   todayHabits,
@@ -18,10 +30,12 @@ import {
   type TodayHabits,
   type ToBuyPreview,
 } from "@/lib/dashboard";
-import { allDoneToday, formatLongDate, weekActivity, type DayActivity } from "@/lib/habits";
-import { getTime, listHabits, type Day } from "@/lib/habits-api";
+import { addDays, formatLongDate } from "@/lib/days";
+import { allDoneToday, weekActivity, type DayActivity } from "@/lib/habits";
+import { listHabits } from "@/lib/habits-api";
 import { LOGIN_PATH, MODULES } from "@/lib/routes";
 import { listShoppingItems } from "@/lib/shopping-api";
+import { getTime, type Day } from "@/lib/time-api";
 import { cn } from "@/lib/utils";
 
 import { TodayHabitRow, ToBuyRow } from "./dashboard-rows";
@@ -45,14 +59,21 @@ export default async function DashboardPage() {
   await connection();
   const user = await requireUser();
   const token = await getSessionToken();
-  const [health, time, habits, items] = await Promise.all([
+  const timeRequest = user && token ? getTime(token) : null;
+  const [health, time, habits, items, events] = await Promise.all([
     checkApiHealth(),
-    user && token ? getTime(token) : null,
+    timeRequest,
     user && token ? listHabits(token) : null,
     user && token ? listShoppingItems(token) : null,
+    // The seven days from today, as /calendar shows them by default.
+    timeRequest?.then((result) =>
+      result.ok && token
+        ? listEvents(token, result.data.today, addDays(result.data.today, AGENDA_DAYS - 1))
+        : null,
+    ) ?? null,
   ]);
   if (
-    [time, habits, items].some(
+    [time, habits, items, events].some(
       (result) => result && !result.ok && result.error === "unauthenticated",
     )
   ) {
@@ -66,6 +87,7 @@ export default async function DashboardPage() {
   // One view of each module's data feeds both the summary cards and the check-off cards,
   // so their numbers always agree.
   const habitsToday = today && habitList ? todayHabits(habitList, today) : null;
+  const plans = today && events?.ok ? todayPlans(events.data, today) : null;
   const shopping = itemList ? toBuyPreview(itemList) : null;
   const doneToday = habitsToday?.done ?? 0;
   const toBuy = shopping?.toBuy ?? 0;
@@ -142,6 +164,8 @@ export default async function DashboardPage() {
         </Card>
       </section>
 
+      <TodayPlansCard plans={plans} />
+
       <div className="grid gap-4 lg:grid-cols-2">
         <TodayHabitsCard habits={habitsToday} today={today} />
         <ToBuyCard shopping={shopping} />
@@ -214,6 +238,87 @@ function ToneTitle({ tone, icon, children }: { tone: Tone; icon: ReactNode; chil
 }
 
 const MODULE_LINK = "text-primary font-semibold underline-offset-4 hover:underline";
+
+/** Today's first few events in agenda order, then how many more today and this week. */
+function TodayPlansCard({ plans }: { plans: TodayPlans | null }) {
+  const total = plans ? plans.shown.length + plans.remaining : 0;
+  return (
+    <Card data-testid="dashboard-plans">
+      <CardHeader>
+        <ToneTitle tone="lavender" icon={<CalendarIcon />}>
+          Today&apos;s plans
+        </ToneTitle>
+        <CardDescription>
+          {!plans
+            ? "Your calendar could not be loaded right now."
+            : total === 0
+              ? "Nothing planned for today."
+              : total === 1
+                ? "One thing planned for today."
+                : `${total} things planned for today.`}
+        </CardDescription>
+      </CardHeader>
+      {plans && (
+        <CardContent className="flex flex-col gap-3">
+          {total === 0 ? (
+            <EmptyState
+              tone="lavender"
+              illustration={<PlanetIllustration />}
+              title="A clear day"
+              className="py-6"
+            >
+              <Link href="/calendar" className={MODULE_LINK}>
+                Plan something
+              </Link>
+            </EmptyState>
+          ) : (
+            <ul className="-mx-3 flex flex-col gap-0.5" aria-label="Today's plans">
+              {plans.shown.map(({ event, time }) => (
+                <li key={event.id} data-testid="dashboard-plan">
+                  <Link
+                    href={`/calendar/${event.id}/edit`}
+                    className="hover:bg-sunken/70 focus-visible:ring-ring focus-visible:ring-offset-card flex items-start gap-3 rounded-2xl px-3 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  >
+                    <span
+                      className={cn(
+                        "w-24 shrink-0 text-sm font-semibold tabular-nums",
+                        event.allDay ? "text-lavender-ink" : "text-muted-foreground",
+                      )}
+                    >
+                      {time}
+                    </span>
+                    <span className="min-w-0 flex-1 font-medium break-words">{event.title}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            {plans.remaining > 0 && (
+              <Link
+                href="/calendar"
+                className={cn(MODULE_LINK, "inline-flex items-center gap-1")}
+                data-testid="dashboard-more-plans"
+              >
+                {moreTodayLabel(plans.remaining)}
+                <ArrowForwardIcon className="size-4" />
+              </Link>
+            )}
+            {plans.week > 0 && (
+              <Link
+                href="/calendar"
+                className="text-muted-foreground underline-offset-4 hover:underline"
+                data-testid="dashboard-week-plans"
+              >
+                {weekPlansLabel(plans.week)}
+              </Link>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
 
 /** Check today's habits off without leaving the Dashboard. */
 function TodayHabitsCard({ habits, today }: { habits: TodayHabits | null; today: Day | null }) {

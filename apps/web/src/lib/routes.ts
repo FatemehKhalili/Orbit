@@ -1,4 +1,4 @@
-/** The MVP modules, in navigation order. Dashboard and Shopping have content so far. */
+/** The MVP modules, in navigation order. Finance and Wishlist do not have content yet. */
 export const MODULES = [
   { name: "Dashboard", href: "/" },
   { name: "Finance", href: "/finance" },

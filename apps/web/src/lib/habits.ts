@@ -15,7 +15,9 @@ import {
   SIGNED_OUT,
   textLength,
 } from "@/lib/forms";
-import type { Day, Habit, HabitChanges, NewHabit } from "@/lib/habits-api";
+import { addDays, formatDay } from "@/lib/days";
+import type { Habit, HabitChanges, NewHabit } from "@/lib/habits-api";
+import type { Day } from "@/lib/time-api";
 
 /** Must match the API (apps/api/app/models/habits.py and app/api/habits.py). */
 export const HABIT_LIMITS = { name: 100, notes: 1000 } as const;
@@ -161,28 +163,6 @@ export async function performCheckIn(
   const result = await api.setCheckIn(token, id, day, done);
   if (!result.ok) return failed(result.error, undefined, { invalid: HABIT_ERRORS.windowClosed });
   return { status: "success" };
-}
-
-// Calendar dates from the API are parsed and formatted in UTC, so the web server's own
-// timezone can never move a day to its neighbour (ADR 0008).
-
-function toUtcDate(day: Day): Date {
-  return new Date(`${day}T00:00:00Z`);
-}
-
-export function addDays(day: Day, days: number): Day {
-  const date = toUtcDate(day);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function formatDay(day: Day, options: Intl.DateTimeFormatOptions): string {
-  return new Intl.DateTimeFormat("en-GB", { ...options, timeZone: "UTC" }).format(toUtcDate(day));
-}
-
-/** "Sunday, 11 October 2026". */
-export function formatLongDate(day: Day): string {
-  return formatDay(day, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
 export type WeekDay = {

@@ -15,8 +15,9 @@ one place.
 > tagged `v0.4.0-phase4`. Phase 5 (Habits) is complete, tagged `v0.5.0-phase5`. Phase 6
 > (running Orbit for real: production deployment, backups, sign-in throttling, export) is
 > complete, tagged `v0.6.0-phase6`. Phase 7 (Today Dashboard: check off today's habits and
-> the first shopping items from the Dashboard) is complete, tagged `v0.7.0-phase7`. The other
-> modules are placeholders.
+> the first shopping items from the Dashboard) is complete, tagged `v0.7.0-phase7`. Phase 8
+> (the internal Calendar: a seven-day agenda and today's plans on the Dashboard) is in
+> progress. Finance and Wishlist are placeholders.
 
 ## MVP modules
 
@@ -109,14 +110,15 @@ CI runs on pushes to `main` and on pull requests (`.github/workflows/ci.yml`):
 | Compose smoke test  | Starts db, api and web, runs `scripts/smoke-test.sh`, then `alembic check` |
 | Production stack    | Only the web app published (on 127.0.0.1); starts `compose.production.yml`, smoke test, API docs off, `alembic check`, then the smoke test again over HTTPS through the Caddy profile |
 | Backup and restore  | Seeds data, backs up, deletes the volume, restores, and proves fingerprints, export and password identical; refusals for a running app, a damaged file and a non-empty database |
-| Upgrade from v0.6.0-phase6 | Upgrades a seeded v0.6.0 production install in place, proves the data and sessions unchanged, runs the smoke test on it, and rolls back by restoring its backup into v0.6.0 |
+| Upgrade from v0.7.0-phase7 | Upgrades a seeded v0.7.0 production install in place, proves every existing table unchanged (and the new `calendar_events` table empty, at the new migration), runs the smoke test on it, rolls back by restoring its backup into v0.7.0, and restores that backup into a fresh install of the new code |
 
 Coverage: API health, configuration, database sessions, migrations, sign-in, sessions, the
-one-owner rule, the admin CLI, the instance timezone, Shopping and Habits including
-ownership with a second user, sign-in throttling, the export and production defaults
-(298 tests); web configuration, the API client, the session and device cookies, the shared
-form helpers, login, Shopping and Habits form logic, the seven-day strip, route
-protection, the export download, client addresses and security headers and the Dashboard's check-off cards (220 tests);
+one-owner rule, the admin CLI, the instance timezone, Shopping, Habits and Calendar
+(including days and times across clock changes) with ownership by a second user, sign-in
+throttling, the export and production defaults (395 tests); web configuration, the API
+client, the session and device cookies, the shared form helpers, login, Shopping, Habits
+and Calendar form logic, the seven-day strip and agenda, route protection, the export
+download, client addresses and security headers and the Dashboard's cards (294 tests);
 and the end-to-end smoke test.
 
 Dependabot (`.github/dependabot.yml`) opens weekly update PRs for the API, the web app,

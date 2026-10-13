@@ -11,9 +11,11 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UnavailableCard } from "@/components/unavailable-card";
 import { getSessionToken, requireUser } from "@/lib/auth";
-import { allDoneToday, formatLongDate, summarize } from "@/lib/habits";
-import { getTime, listHabits } from "@/lib/habits-api";
+import { formatLongDate } from "@/lib/days";
+import { allDoneToday, summarize } from "@/lib/habits";
+import { listHabits } from "@/lib/habits-api";
 import { LOGIN_PATH } from "@/lib/routes";
+import { getTime } from "@/lib/time-api";
 
 import { AddHabitForm } from "./add-habit-form";
 import { HabitRow } from "./habit-row";

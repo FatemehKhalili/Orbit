@@ -51,6 +51,12 @@ def add_habit(client, token, name):
     return response.json()
 
 
+def add_event(client, token, **fields):
+    response = client.post("/calendar/events", json=fields, headers=bearer(token))
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 @pytest.mark.integration
 def test_export_holds_everything_the_owner_has(client, token, owner, session_factory):
     milk = add_item(client, token, name="Milk", quantity="2 l")
@@ -71,6 +77,21 @@ def test_export_holds_everything_the_owner_has(client, token, owner, session_fac
         )
         session.commit()
 
+    # Events far in the past and the future are all there.
+    trip = add_event(
+        client,
+        token,
+        title="Trip",
+        notes="Pack light",
+        when={"all_day": True, "start_day": "2026-10-20", "end_day": "2026-10-23"},
+    )
+    dentist = add_event(
+        client,
+        token,
+        title="Dentist",
+        when={"all_day": False, "start_day": "2025-03-01", "start_time": "09:00"},
+    )
+
     response = client.get(EXPORT, headers=bearer(token))
 
     assert response.status_code == 200
@@ -82,7 +103,7 @@ def test_export_holds_everything_the_owner_has(client, token, owner, session_fac
     body = response.json()
     ExportOut.model_validate(body)  # the shape the schema publishes, nothing extra
     assert body["format"] == "orbit-export"
-    assert body["format_version"] == "1.0"
+    assert body["format_version"] == "1.1"
     assert body["timezone"] == "UTC"
     assert abs(datetime.fromisoformat(body["exported_at"]) - datetime.now(UTC)) < timedelta(
         minutes=1
@@ -103,12 +124,40 @@ def test_export_holds_everything_the_owner_has(client, token, owner, session_fac
     assert [c["day"] for c in habits["Read"]["check_ins"]] == ["2026-09-01", "2026-10-11"]
     assert [c["day"] for c in habits["Run"]["check_ins"]] == ["2025-01-02"]
 
+    assert body["calendar"]["events"] == [
+        {
+            "id": trip["id"],
+            "title": "Trip",
+            "notes": "Pack light",
+            "all_day": True,
+            "start_day": "2026-10-20",
+            "end_day": "2026-10-23",
+            "starts_at": None,
+            "ends_at": None,
+            "created_at": trip["created_at"],
+            "updated_at": trip["updated_at"],
+        },
+        {
+            "id": dentist["id"],
+            "title": "Dentist",
+            "notes": None,
+            "all_day": False,
+            "start_day": None,
+            "end_day": None,
+            "starts_at": "2025-03-01T09:00:00Z",
+            "ends_at": "2025-03-01T09:00:00Z",
+            "created_at": dentist["created_at"],
+            "updated_at": dentist["updated_at"],
+        },
+    ]
+
 
 @pytest.mark.integration
 def test_export_of_a_new_owner_is_empty_but_complete(client, token):
     body = client.get(EXPORT, headers=bearer(token)).json()
     assert body["shopping"] == {"items": []}
     assert body["habits"] == {"habits": []}
+    assert body["calendar"] == {"events": []}
 
 
 @pytest.mark.integration
@@ -137,6 +186,9 @@ def test_export_never_includes_another_users_data(two_users_client):
     add_item(client, other_token, name="Other bread")
     add_habit(client, owner_token, "Owner reading")
     other_habit = add_habit(client, other_token, "Other running")
+    when = {"all_day": True, "start_day": "2026-10-14"}
+    add_event(client, owner_token, title="Owner trip", when=when)
+    add_event(client, other_token, title="Other trip", when=when)
     client.put(
         f"/habits/habits/{other_habit['id']}/check-ins/{date.today()}",
         headers=bearer(other_token),
@@ -146,6 +198,7 @@ def test_export_never_includes_another_users_data(two_users_client):
     other_text = client.get(EXPORT, headers=bearer(other_token)).text
 
     assert "Owner milk" in owner_text and "Owner reading" in owner_text
+    assert "Owner trip" in owner_text
     assert "Other" not in owner_text and OTHER_EMAIL not in owner_text
     assert "Owner" not in other_text
     other_body = client.get(EXPORT, headers=bearer(other_token)).json()

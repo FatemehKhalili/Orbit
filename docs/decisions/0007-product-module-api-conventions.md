@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-10-03
+- Amended by: [ADR 0011](0011-calendar-events-and-time.md) (bounded date ranges instead of
+  pagination for lists that grow by date)
 
 ## Context
 

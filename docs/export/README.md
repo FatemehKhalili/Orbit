@@ -20,9 +20,9 @@ differ; regenerate it with:
 ```json
 {
   "format": "orbit-export",
-  "format_version": "1.0",
+  "format_version": "1.1",
   "exported_at": "2026-10-11T17:00:00.123456Z",
-  "orbit_version": "0.7.0",
+  "orbit_version": "0.8.0",
   "timezone": "Europe/Berlin",
   "account": { "email": "you@example.com", "display_name": "You", "created_at": "..." },
   "shopping": {
@@ -37,14 +37,29 @@ differ; regenerate it with:
         "created_at": "…", "updated_at": "…",
         "check_ins": [ { "day": "2026-10-10", "created_at": "…" } ] }
     ]
+  },
+  "calendar": {
+    "events": [
+      { "id": "…", "title": "Trip", "notes": null, "all_day": true,
+        "start_day": "2026-10-20", "end_day": "2026-10-23", "starts_at": null, "ends_at": null,
+        "created_at": "…", "updated_at": "…" },
+      { "id": "…", "title": "Dentist", "notes": null, "all_day": false,
+        "start_day": null, "end_day": null,
+        "starts_at": "2026-10-14T07:00:00Z", "ends_at": "2026-10-14T07:00:00Z",
+        "created_at": "…", "updated_at": "…" }
+    ]
   }
 }
 ```
 
 - **Everything you own:** every shopping item, every habit (active and archived) and
-  every check-in of its whole history, not only the seven days the pages show. Items and
-  habits are in the order you added them; check-ins oldest first.
-- **Times** (`*_at`) are UTC timestamps (ISO 8601). **Days** (`day`) are calendar dates
+  every check-in of its whole history, not only the seven days the pages show, and every
+  calendar event, past and future. Items, habits and events are in the order you added
+  them; check-ins oldest first.
+- **Calendar events** have one of two shapes ([ADR 0011](../decisions/0011-calendar-events-and-time.md)):
+  all day, with `start_day` and `end_day` (inclusive) and null instants; or timed, with
+  `starts_at` and `ends_at` (equal for a moment such as "Dentist, 09:00") and null days.
+- **Times** (`*_at`) are UTC timestamps (ISO 8601). **Days** (`day`, `*_day`) are calendar dates
   in the instance timezone, given as `timezone` ([ADR 0008](../decisions/0008-dates-and-the-instance-timezone.md)).
 - **IDs** are stable: the same item has the same `id` in every export.
 - Every object is closed (`additionalProperties: false`); a field is never left out, it
@@ -68,7 +83,8 @@ when a new table is in neither, so each new module decides what its export holds
 ## Versions
 
 `format_version` is `MAJOR.MINOR`. A new module or a new field raises the minor version
-(`1.1`): readers of `1.0` that ignore unknown sections keep working. Renaming or removing
+(`1.1`): readers of `1.0` that ignore unknown sections keep working. Version `1.1`
+(Orbit 0.8.0) added `calendar`. Renaming or removing
 a field, or changing its meaning, raises the major version and publishes a new schema
 file (`orbit-export-2.schema.json`).
 

@@ -42,7 +42,8 @@ and self-hostable, so a person's life data stays under their control.
 | 5     | Habits: daily habits checked off over the last seven days, archive and delete, one instance timezone | Complete    |
 | 6     | Run Orbit for real: production deployment, backup and restore, sign-in throttling, data export, upgrade and rollback | Complete    |
 | 7     | Today Dashboard: check off today's habits and the first shopping items from the Dashboard | Complete    |
-| 8+    | To be defined                                                         | Not started |
+| 8     | Calendar: all-day and timed events in a seven-day agenda, "Today's plans" on the Dashboard | In progress |
+| 9+    | To be defined (proposed for 9: two-way Google Calendar sync, ADR 0012) | Not started |
 
 Phase 1 delivers no product features. The web app shows a placeholder with the six
 modules and the backend's health.
@@ -288,3 +289,51 @@ the habit. The upgrade job now starts from `v0.6.0-phase6`.
 Out of scope for Phase 7: adding, editing or deleting from the Dashboard, earlier days,
 undo, reordering or hiding cards, streaks and statistics, notifications, and any Calendar,
 Finance or Wishlist content.
+
+## Phase 8: Calendar
+
+Phase 8 turns the Calendar placeholder into a working module: events the owner adds,
+edits and deletes, a seven-day agenda, and today's events on the Dashboard. Its model is
+chosen so that two-way Google Calendar sync can be added later without changing stored
+events (ADR 0011), but Phase 8 has no Google code, setting, table or dependency.
+
+**What the owner can do:**
+
+- **Add an event** on `/calendar`: a title, optional notes, and either **all day** (one
+  day, or a span of days such as a trip) or **at a time** (a start date and time, and an
+  optional end date and time). With no end time the event is a moment ("Dentist, 09:00").
+  A timed event may cross midnight or span days.
+- **See a seven-day agenda** starting today: every day listed, all-day events first, then
+  timed events by start time. An event spanning days shows on every day it covers.
+  Previous and Next move the seven days by seven; Today goes back.
+- **Edit an event**, and **delete** it after confirming on a second step, from its edit
+  page.
+- On the Dashboard, a full-width **Today's plans** card under "At a glance": up to five of
+  today's events in agenda order, "and N more today" when there are more, and a link with
+  the number of events in the next seven days.
+
+**Rules:**
+
+- Times are typed and shown in the instance timezone (`ORBIT_TIMEZONE`) and stored as
+  instants. A time that does not exist on a clock-change day is refused with a clear
+  message; a time that happens twice means the first one. Changing the instance timezone
+  later keeps timed events at the same moment, shown at the new local time.
+- An all-day event's end day is inclusive. A timed event ending exactly at midnight is not
+  shown on the next day.
+- A title is 1 to 200 characters, notes at most 8,000, and an event spans at most 366 days.
+- Past and future events can be changed alike. Only the owner's own events are visible.
+- The API answers date ranges of at most 62 days instead of paginating (ADR 0011).
+- The data export gains `calendar.events` (format 1.1).
+
+**Look:** Calendar's existing lavender tone and components; the "soon" badge goes. Works
+without JavaScript, in dark mode, at phone width and right to left.
+
+**Testing:** API tests for every route, both event shapes, the day rules across midnight
+and clock changes in several timezones, ownership and the range limit; web unit tests for
+the forms, the agenda window and grouping, and the Dashboard card; the smoke test adds,
+sees, edits, and deletes an event through the forms. The upgrade job starts from
+`v0.7.0-phase7`, the first upgrade with a migration since Phase 6.
+
+Out of scope for Phase 8: Google Calendar or any other sync, recurring events, reminders
+and notifications, `.ics` import or export, a month grid, several calendars, colours or
+categories, locations and attendees, a timezone per event, search, bulk actions and undo.

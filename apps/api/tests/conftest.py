@@ -51,7 +51,7 @@ def db_settings(monkeypatch) -> Iterator[Settings]:
         connection.execute(
             text(
                 "TRUNCATE users, sessions, login_throttles, login_devices,"
-                " shopping_items, habits, habit_check_ins CASCADE"
+                " shopping_items, habits, habit_check_ins, calendar_events CASCADE"
             )
         )
     engine.dispose()

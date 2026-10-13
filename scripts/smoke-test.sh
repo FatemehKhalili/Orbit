@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Check a running stack end to end: health endpoints, then the owner signing in and out
 # through the web app's login form (proving web -> API -> database and the session cookie),
-# and using the Shopping list and Habits through their forms in between.
+# and using the Shopping list, Habits and the Calendar through their forms in between.
 # Usage: ./scripts/smoke-test.sh   (after `docker compose up`)
 #
 # For the production stack, point Compose at it (COMPOSE_FILE=compose.production.yml plus
@@ -260,6 +260,47 @@ grep -qi "^location: /habits/archived" "$WORK/headers" || fail "web: deleting a 
 [ "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SESSION" "$API_URL/habits/habits/$HID")" = 404 ] \
   || fail "web: deleting the archived habit did not remove it"
 ok "web deletes an archived habit"
+
+# Calendar, through the same forms: add an event today, see it on the Dashboard, edit
+# it, and delete it through the confirmation page (the only form that can delete).
+[ "$(curl -sS -o /dev/null -w '%{http_code}' "$API_URL/calendar/events?from=$TODAY&to=$TODAY")" = 401 ] \
+  || fail "api: /calendar/events must refuse requests without a session"
+ok "api refuses calendar requests without a session"
+
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/calendar") || fail "web: /calendar failed"
+case $body in *'data-testid="agenda"'*) ok "web calendar agenda" ;; *) fail "web: /calendar did not show the agenda" ;; esac
+
+EVENT="Smoke test dentist $(date +%s)"
+FORM=add-event-form submit_form "$WEB_URL/calendar" "$SESSION" \
+  --form-string "title=$EVENT" --form-string "notes=" --form-string "startDay=$TODAY" \
+  --form-string "startTime=09:00" --form-string "endDay=" --form-string "endTime=09:45"
+EID=$(api_get "/calendar/events?from=$TODAY&to=$TODAY" | tr '{' '\n' | grep -F "\"title\":\"$EVENT\"" \
+  | sed -n 's/^"id":"\([^"]*\)".*/\1/p')
+[ -n "$EID" ] || fail "web: adding an event through the form did not create it"
+case $(api_get "/calendar/events/$EID") in
+  *'"start_time":"09:00"'*'"end_time":"09:45"'*) ok "web adds an event" ;;
+  *) fail "web: the new event has the wrong time" ;;
+esac
+
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/") || fail "web: dashboard failed"
+case $body in *'data-testid="dashboard-plans"'*"$EVENT"*) ok "web dashboard shows today's plans" ;; *) fail "web: the event is not in today's plans" ;; esac
+
+FORM=edit-event-form submit_form "$WEB_URL/calendar/$EID/edit" "$SESSION" \
+  --form-string "title=$EVENT (moved)" --form-string "notes=" --form-string "startDay=$TODAY" \
+  --form-string "startTime=10:00" --form-string "endDay=" --form-string "endTime="
+grep -qi "^location: /calendar" "$WORK/headers" || fail "web: saving an event did not return to /calendar"
+case $(api_get "/calendar/events/$EID") in
+  *"(moved)"*'"start_time":"10:00"'*) ok "web edits an event" ;;
+  *) fail "web: editing the event did not stick" ;;
+esac
+
+body=$(curl -fsS --max-time 10 -H "Cookie: $COOKIE=$SESSION" "$WEB_URL/calendar/$EID/delete") || fail "web: delete page failed"
+case $body in *"Delete this event?"*) ;; *) fail "web: the delete page did not ask for confirmation" ;; esac
+FORM=delete-event-form submit_form "$WEB_URL/calendar/$EID/delete" "$SESSION"
+grep -qi "^location: /calendar" "$WORK/headers" || fail "web: deleting an event did not return to /calendar"
+[ "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SESSION" "$API_URL/calendar/events/$EID")" = 404 ] \
+  || fail "web: confirming the delete did not remove the event"
+ok "web deletes an event after confirmation"
 
 FORM=sign-out-form submit_form "$WEB_URL/" "$SESSION"
 grep -qi "^location: /login" "$WORK/headers" || fail "web: signing out did not redirect to /login"

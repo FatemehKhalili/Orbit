@@ -16,13 +16,17 @@ Open http://localhost:3000 and sign in with the owner account (create it with th
 `create-owner` command, see [apps/api/README.md](../api/README.md)). The dashboard greets the
 owner with today's date and shows how many habits are done today, how many shopping items
 are left to buy, a **Backend** card that reports the API's `/health/ready` result, a
-seven-day habit chart and the module orbit. Its **Today's habits** and **To buy** cards
+seven-day habit chart and the module orbit. Its **Today's plans** card lists up to five of
+today's calendar events, then how many more today and this week. Its **Today's habits** and **To buy** cards
 check off today's habits and the first five unchecked items with the Habits and Shopping
 Server Actions. **Shopping** (`/shopping`) is the owner's shopping list.
 **Habits** (`/habits`) lists active habits, each with a strip of the last seven days to
 check off; `/habits/[id]/edit` edits, archives or restores one, and `/habits/archived` lists
-archived habits, which can be restored or deleted for good. The other modules have
-placeholder pages.
+archived habits, which can be restored or deleted for good. **Calendar** (`/calendar`) shows
+seven days from today, every day listed, with an add form; `?from=YYYY-MM-DD` and the
+Previous and Next links move it by seven days. `/calendar/[id]/edit` edits an event and
+links to `/calendar/[id]/delete`, the confirmation page that is the only way to delete one.
+Finance and Wishlist have placeholder pages.
 
 Server code calls the API through `src/lib/api-client.ts` (`apiRequest()`), which adds the
 session token and maps failures to `unauthenticated`, `not_found`, `conflict`, `invalid` or

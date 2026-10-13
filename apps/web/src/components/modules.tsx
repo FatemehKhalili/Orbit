@@ -34,7 +34,7 @@ export const MODULE_LOOK: Record<
 > = {
   "/": { icon: HomeIcon, tone: "lavender", ready: true },
   "/finance": { icon: WalletIcon, tone: "mint", ready: false },
-  "/calendar": { icon: CalendarIcon, tone: "lavender", ready: false },
+  "/calendar": { icon: CalendarIcon, tone: "lavender", ready: true },
   "/habits": { icon: SproutIcon, tone: "mint", ready: true },
   "/shopping": { icon: BasketIcon, tone: "peach", ready: true },
   "/wishlist": { icon: GiftIcon, tone: "blush", ready: false },
